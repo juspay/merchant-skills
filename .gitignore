@@ -1,0 +1,24 @@
+# IDEs
+*.idea*
+.vscode/
+.DS_Store
+
+# Environment variables (sensitive data)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+CHANGELOG.md
+brains
+# OS files
+Thumbs.db
