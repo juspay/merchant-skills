@@ -1,15 +1,15 @@
 ---
 name: juspay-docs-mcp
-description: How to fetch Juspay documentation through the juspay-docs MCP server. Use whenever a Juspay skill needs endpoint, payload, or field detail — it is the shared documentation-access dependency for every integration and foundation skill.
+description: How to fetch Juspay documentation through the juspay-docs MCP server. Use whenever a Juspay skill needs endpoint, payload, or field detail — it is the shared documentation-access dependency for every integration skill.
 ---
 
 # juspay-docs MCP — documentation access
 
-Every integration and foundation skill in this bank defers endpoint, payload,
-and field detail to the **juspay-docs MCP** — a hosted Model Context Protocol
-server that serves Juspay's official docs as clean Markdown. This skill is how
-the agent reaches it. The MCP is the **final source of truth** for schemas; skill
-cards never hand-maintain or hallucinate them.
+Every integration skill in this bank defers endpoint, payload, and field detail
+to the **juspay-docs MCP** — a hosted Model Context Protocol server that serves
+Juspay's official docs as clean Markdown. This skill is how the agent reaches it.
+The MCP is the **final source of truth** for schemas; skill cards never
+hand-maintain or hallucinate them.
 
 ## The server
 
@@ -36,9 +36,12 @@ SDK), `api` (Express Checkout API). Each integration skill states its own.
 ## Fetch workflow
 
 1. **Gather context** — `merchant_id`, `client_id`, `platform`, and the
-   `integration_type` from the integration skill in play. Use **real values from
-   the merchant** — never placeholders. (The MCP's server instructions detail
-   this; follow them.)
+   `integration_type` from the integration skill in play. `merchant_id`,
+   `client_id`, and `environment` may already be in `~/.config/juspay/config.json`
+   (written by `juspay-claude init`) — read that file and use those values
+   instead of re-asking. `integration_type` and `platform` are always determined
+   in-chat. Use **real values** — never placeholders. (The MCP's server
+   instructions detail this; follow them.)
 2. **`list_doc_sources`** with that context → returns the doc index for that
    configuration.
 3. **`fetch_docs`** the index → discover the page URLs inside it.

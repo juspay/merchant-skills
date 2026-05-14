@@ -34,6 +34,20 @@ bank. It is fetched live from the **juspay-docs MCP**, per product. See
 workflow. Skill cards curate *which* docs matter; the MCP serves them. Never
 hardcode `juspay.io` URLs and never hallucinate a field — go through the MCP.
 
+## Merchant context
+
+`juspay-claude init` (the CLI installer) collects the merchant's `merchant_id`,
+`client_id`, and `environment` and writes them to `~/.config/juspay/config.json`
+(or `$XDG_CONFIG_HOME/juspay/config.json`).
+
+**Before asking the merchant for those values, read that file.** If it exists,
+use the values in it directly — they are the merchant's real credentials
+gathered at setup, so they satisfy the MCP's "use actual values, never
+placeholders" rule. Ask only if the file is missing or a value is absent.
+
+`integration_type` and `platform` are *not* in the file — they are
+per-integration choices, always determined in-chat.
+
 ## Layer contract
 
 ```text

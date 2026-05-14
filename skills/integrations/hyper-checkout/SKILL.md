@@ -270,10 +270,17 @@ Enforce these regardless of platform:
 
 ## Gotchas (digest)
 
-Consolidated from warnings scattered across the docs:
+Consolidated from warnings scattered across the docs and issues found in
+integration testing:
 
 - **`order_id` is the idempotency key** — unique, ≤ 21 alphanumeric chars.
   Generate and persist it before the first `/session` call; reuse it on retry.
+- **Wait for `initiate_result` before calling `process()`** — in the
+  initiate/process flows (Native SDK and Web iframe), track SDK readiness by
+  listening for the `initiate_result` event in the SDK callback, and gate
+  `process()` on it. Do **not** rely on an `isInitialised()` check at click
+  time — it can still return false if initiation hasn't finished, so `process()`
+  fires too early and the checkout overlay never renders.
 - **The session payload expires** — `sdk_payload.clientAuthTokenExpiry`
   (native / iframe) or the `payment_link` validity (web redirect). If the user
   returns later, re-issue `/session` with the same `order_id` to refresh it.
