@@ -59,7 +59,7 @@ sequenceDiagram
     MS->>JS: Session API (server-to-server)
     JS-->>MS: Respond with sdk_payload
     MS-->>MA: Forward sdk_payload
-    MA->>SDK: Process Payments Page SDK API
+    MA->>SDK: Process Payments Page SDK
     SDK->>JS: Transaction creation
     SDK->>JS: Display payment methods
     SDK->>JS: Link / unlink cards & wallets
@@ -274,8 +274,6 @@ Consolidated from warnings scattered across the docs:
 
 - **`order_id` is the idempotency key** — unique, ≤ 21 alphanumeric chars.
   Generate and persist it before the first `/session` call; reuse it on retry.
-- **`x-routing-id` must be consistent** — the same value (the `customer_id`, or
-  an order/cart id for guests) on every call for that customer.
 - **The session payload expires** — `sdk_payload.clientAuthTokenExpiry`
   (native / iframe) or the `payment_link` validity (web redirect). If the user
   returns later, re-issue `/session` with the same `order_id` to refresh it.
