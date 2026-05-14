@@ -66,19 +66,18 @@ non-negotiables; it fetches every schema and cross-cutting detail through
 A test application is included in `test_app/` to validate the full integration
 flow. Here's how to test:
 
-### 1. Build and Package the CLI
+### 1. Install the CLI Tool
+
+The CLI package is included in `test_app/` directory. Install it globally:
 
 ```bash
-cd /path/to/juspay-cli/claude-cli
-bun run build
-npm pack
-# This creates: juspay-claude-code-skill-0.1.0.tgz
+cd test_app
+npm install -g ./juspay-claude-code-skill-0.1.0.tgz
 ```
 
-### 2. Install the CLI Tool
-
+Verify installation:
 ```bash
-npm install -g ./juspay-claude-code-skill-0.1.0.tgz
+juspay-claude help
 ```
 
 ### 3. Initialize Juspay Skills
