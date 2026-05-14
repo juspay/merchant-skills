@@ -61,6 +61,86 @@ Knowledge flows one direction. An orchestrator owns the sequence, decisions, and
 non-negotiables; it fetches every schema and cross-cutting detail through
 `mcp/juspay-docs-mcp/`.
 
+## Testing End-to-End with Claude Code
+
+A test application is included in `test_app/` to validate the full integration
+flow. Here's how to test:
+
+### 1. Build and Package the CLI
+
+```bash
+cd /path/to/juspay-cli/claude-cli
+bun run build
+npm pack
+# This creates: juspay-claude-code-skill-0.1.0.tgz
+```
+
+### 2. Install the CLI Tool
+
+```bash
+npm install -g ./juspay-claude-code-skill-0.1.0.tgz
+```
+
+### 3. Initialize Juspay Skills
+
+```bash
+juspay-claude init
+```
+
+You'll be prompted for:
+- **Merchant ID**: your sandbox merchant ID
+- **Client ID**: your sandbox client ID
+- **Environment**: `sandbox` (recommended for testing)
+
+This fetches skills from GitHub and registers the MCP server.
+
+### 4. Open the Test App
+
+```bash
+cd test_app/test-ecomm2
+claude
+```
+
+### 5. Invoke the Skill
+
+Inside Claude Code, type:
+
+```
+/juspay-skills
+```
+
+Or ask naturally:
+
+```
+Help me integrate Juspay payments into this React app
+```
+
+### 6. Follow the Integration Flow
+
+Claude will guide you through:
+1. **Choose integration**: HyperCheckout (easiest), Express Checkout SDK, or API
+2. **Select platform**: web, android, ios, flutter, etc.
+3. **Review architecture**: sequence diagrams for your platform
+4. **Fetch live docs**: via MCP — endpoint schemas, payloads, examples
+5. **Implement**: guided code snippets and SDK integration steps
+
+### 7. Verification Commands
+
+Check what skills are installed:
+```bash
+juspay-claude skills list
+```
+
+Update to latest skills:
+```bash
+juspay-claude skills update
+```
+
+See installed version:
+```bash
+juspay-claude skills version
+```
+
 ## Prerequisites
 
 <!-- TODO: Juspay account + credentials, supported agent tooling, dev environment -->
