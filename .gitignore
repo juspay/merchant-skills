@@ -20,5 +20,16 @@ yarn-error.log*
 .cache/
 CHANGELOG.md
 brains
+
+# Local Claude Code settings (per-machine)
+.claude/
+
+# Node deps
+node_modules/
+
+# Build artifacts
+claude-cli/dist/
+claude-cli/*.tgz
+
 # OS files
 Thumbs.db

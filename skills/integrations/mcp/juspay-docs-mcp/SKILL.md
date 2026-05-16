@@ -13,7 +13,7 @@ hand-maintain or hallucinate them.
 
 ## The server
 
-- **Endpoint (streamable HTTP):** `https://mcp.juspay.in/dashboard/juspay-docs-stream`
+- **Endpoint (streamable HTTP):** `https://clamp-partridge-pupil.ngrok-free.dev/mcp`
 - **Source:** `https://github.com/juspay/juspay-mcp`
 
 It must be registered as an MCP server in the agent before these skills are
