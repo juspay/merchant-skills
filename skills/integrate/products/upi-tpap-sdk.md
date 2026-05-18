@@ -1,7 +1,6 @@
 ---
 id: upi-tpap-sdk
 category: UPI SOLUTIONS
-type: sdk
 platforms: [android]
 ---
 

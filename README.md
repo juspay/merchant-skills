@@ -1,165 +1,139 @@
 # Juspay Skills
 
-<!-- SKELETON — content to be filled in. -->
-
-Agent Skills for integrating Juspay payment products. Drop these into your coding
-agent and it gets structured, navigable context for **HyperCheckout**,
-**Express Checkout SDK**, and **Express Checkout API** — instead of guessing
-endpoint shapes from training data.
-
-> **Status:** under construction — skeleton only.
+Agent skills that give your coding agent structured, doc-driven context for integrating [Juspay](https://juspay.io) payment products.
 
 ## What this is
 
-A structured **skill bank** organised into layers — a shared documentation-access
-skill (the juspay-docs MCP), integration orchestrators, a go-live checklist, and
-a bank-level entry point. Each skill is its own folder with a `SKILL.md`, a crisp
-activation trigger, a single responsibility, and links to the skills it depends
-on.
+A skill bank that adds a `/integrate` command to Claude Code. When invoked, the agent runs a fully guided wizard that:
 
-The full methodology — layers, `SKILL.md` anatomy, naming, splitting heuristics,
-authoring quality bar, phasing — lives in [`docs/framework.md`](./docs/framework.md).
+1. Reads your merchant account configuration live (via the Juspay MCP).
+2. Recommends the right product for your use case.
+3. Detects your tech stack from the codebase.
+4. Fetches authoritative documentation on demand (via the Juspay Docs MCP).
+5. Generates complete integration code using only doc-sourced method names and field names.
+6. Configures webhooks and return URLs on your account.
+7. Provisions an API key and runs live tests against your dev server.
 
-## Docs strategy — hybrid
 
-Skill cards own **structure, sequence, decisions, and gotchas**. Exhaustive
-endpoint, payload, and field schemas are fetched on demand from the **juspay-docs
-MCP server** (hosted at `https://mcp.juspay.in/dashboard/juspay-docs-stream`,
-source [`juspay/juspay-mcp`](https://github.com/juspay/juspay-mcp)) — skills go
-through the MCP rather than hand-maintaining or hardcoding doc URLs, so
-field-level detail stays current.
 
-## Structure
+## Prerequisites
 
-```text
-skills/
-├── SKILL.md            # bank entry point — navigation
-├── mcp/                # juspay-docs-mcp — the shared documentation-access skill
-├── integrations/       # hyper-checkout, express-checkout-sdk, express-checkout-api
-└── go-live/            # production-readiness-checklist
-```
+- [Claude Code](https://claude.ai/code) or [Open Code](https://opencode.ai/) installed
+- A Juspay merchant account.
+- Both Juspay MCP servers configured — refer to their [GitHub](https://github.com/juspay/juspay-mcp) repository for setup instructions.
 
-| Layer | What it owns |
-|-------|--------------|
-| **`mcp/`** | The juspay-docs MCP skill — server, tools, fetch workflow; the shared docs-access dependency for every other skill |
-| **`integrations/`** | Per-product orchestrators — the end-to-end sequence, decisions, gotchas, and non-negotiables; fetch every schema and cross-cutting detail via the MCP |
-| **`go-live/`** | Production-readiness checklist |
-| **Bank `SKILL.md`** | Top-level entry point that orients the agent across the bank |
+## Installation
 
-Cross-cutting concerns — auth, webhooks, error codes, the order-status enum —
-are **not** a layer here: each product's MCP docs carry them per-product, so an
-integration card just points at the relevant doc pages.
+Claude Code automatically discovers skills placed in the right directory — no config commands needed.
 
-## Layer contract
-
-```text
-integrations/  →  mcp/
-(sequence)        (docs access)
-```
-
-Knowledge flows one direction. An orchestrator owns the sequence, decisions, and
-non-negotiables; it fetches every schema and cross-cutting detail through
-`mcp/juspay-docs-mcp/`.
-
-## Testing End-to-End with Claude Code
-
-A test application is included in `test_app/` to validate the full integration
-flow. Here's how to test:
-
-### 1. Install the CLI Tool
-
-The CLI package is included in `test_app/` directory. Install it globally:
+**Global (available in all projects)**
 
 ```bash
-cd test_app
-npm install -g ./juspay-claude-code-skill-0.1.0.tgz
+mkdir -p ~/.claude/skills
+cp -r skills/integrate ~/.claude/skills/
 ```
 
-Verify installation:
-```bash
-juspay-claude help
-```
-
-### 3. Initialize Juspay Skills
+**Project-scoped (current project only)**
 
 ```bash
-juspay-claude init
+mkdir -p .claude/skills
+cp -r skills/integrate .claude/skills/
 ```
 
-You'll be prompted for:
-- **Merchant ID**: your sandbox merchant ID
-- **Client ID**: your sandbox client ID
-- **Environment**: `sandbox` (recommended for testing)
+## Usage
 
-This fetches skills from GitHub and registers the MCP server.
-
-### 4. Open the Test App
-
-```bash
-cd test_app/test-ecomm2
-claude
-```
-
-### 5. Invoke the Skill
-
-Inside Claude Code, type:
+Open Claude Code in your project directory and run:
 
 ```
-/juspay-skills
+/integrate
 ```
 
 Or ask naturally:
 
 ```
-Help me integrate Juspay payments into this React app
+Help me integrate Juspay payments into this app
 ```
 
-### 6. Follow the Integration Flow
-
-Claude will guide you through:
-1. **Choose integration**: HyperCheckout (easiest), Express Checkout SDK, or API
-2. **Select platform**: web, android, ios, flutter, etc.
-3. **Review architecture**: sequence diagrams for your platform
-4. **Fetch live docs**: via MCP — endpoint schemas, payloads, examples
-5. **Implement**: guided code snippets and SDK integration steps
-
-### 7. Verification Commands
-
-Check what skills are installed:
-```bash
-juspay-claude skills list
+```
+Set up Hyper Checkout for my React Native app
 ```
 
-Update to latest skills:
-```bash
-juspay-claude skills update
+```
+I need to add payouts to my backend
 ```
 
-See installed version:
-```bash
-juspay-claude skills version
+### Flags
+
+| Flag | Effect |
+|------|--------|
+| `--product <id>` | Skip the recommendation step and go straight to integrating a specific product |
+| `--platform <id>` | Hint the platform — the agent still verifies against your codebase |
+
+Example:
+
+```
+/integrate --product hyper-checkout --platform flutter
 ```
 
-## Prerequisites
+## How it works
 
-<!-- TODO: Juspay account + credentials, supported agent tooling, dev environment -->
+The skill runs a 7-phase workflow:
 
-## Installation
+| Phase | What happens |
+|-------|-------------|
+| **0 — Intent & product selection** | Reads your merchant account, infers the recommended product from your integration type, confirms with you |
+| **1 — Doc structure** | Calls `explore_product` to get the full documentation map for the chosen product |
+| **2 — Platform detection** | Scans your codebase for platform signals (pubspec.yaml, AndroidManifest.xml, package.json, etc.) before asking |
+| **3 — Doc fetch** | Fetches each documentation page in the required order — prerequisites first, then numbered integration steps |
+| **4 — Parameter collection** | Auto-resolves merchant ID, client ID, webhook URL, and return URL from your account; provisions an API key; asks only for what it can't derive |
+| **5 — Code generation** | Generates auth setup, core integration, webhook handler, status verification, DB schema, and error handling — using only method names from the fetched docs |
+| **6 — Checklist & error reference** | Produces a per-product integration checklist (pulled from live integration monitoring) and an error code reference |
+| **7 — Live testing** | Starts your dev server, sends real HTTP requests to each generated endpoint, and reports a pass/fail table |
 
-<!-- TODO: setup.sh detects the coding agent and installs skills into the right path -->
+## Docs strategy
 
-## Usage Examples
+Skill files own **structure, sequence, decisions, and gotchas**. Exhaustive endpoint schemas and field-level detail are fetched on demand from the **docs MCP server** — so the skill stays current without hand-maintaining doc copies.
 
-<!-- TODO: prompt-style examples -->
+## Repository structure
 
-## Scope
+```
+skills/
+└── integrate/
+    ├── SKILL.md          # /integrate command — the decision engine
+    └── products/         # One file per product — ID, type, platforms, intent signals
+        ├── hyper-checkout.md
+        ├── ec-headless.md
+        ├── ec-api.md
+        ├── hyper-credit.md
+        ├── lotuspay.md
+        ├── payout.md
+        ├── jusbiz.md
+        ├── juspay-billing.md
+        ├── upi-plugin-sdk.md
+        └── upi-tpap-sdk.md
+```
 
-<!-- TODO: decide backend-only vs incl. frontend SDK; in-scope / out-of-scope -->
+`SKILL.md` contains no product knowledge — all product facts come from `products/` files or live MCP responses. This keeps the orchestrator stable while products evolve independently.
 
 ## Contributing
 
-<!-- TODO -->
+Product entries live in `skills/integrate/products/`. Each file follows this schema:
+
+```yaml
+---
+id: <kebab-case-id>
+category: CHECKOUT | PAYOUTS | BILLING | UPI SOLUTIONS
+platforms: [android, ios, web, flutter, react-native, ...]
+---
+
+## What it is
+## When to recommend
+## Key concepts
+## Intent signals
+```
+
+To add a new product, create a file in `products/` and ensure the product is accessible via the `docs-mcp-server` `explore_product` tool. No changes to `SKILL.md` are needed.
 
 ## License
 
-<!-- TODO: see LICENSE -->
+See [LICENSE](./LICENSE).

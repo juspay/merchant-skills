@@ -1,7 +1,6 @@
 ---
 id: juspay-billing
 category: BILLING
-type: api-only
 platforms: []
 ---
 

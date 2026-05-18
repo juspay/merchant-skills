@@ -1,7 +1,6 @@
 ---
 id: ec-headless
 category: CHECKOUT
-type: sdk
 platforms: [android, ios, flutter, react-native, cordova, capacitor, web]
 ---
 
