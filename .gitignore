@@ -27,9 +27,8 @@ brains
 # Node deps
 node_modules/
 
-# Build artifacts
-claude-cli/dist/
-claude-cli/*.tgz
+# CLI source lives in a separate Bitbucket repo (juspay-cli)
+claude-cli/
 
 # OS files
 Thumbs.db
