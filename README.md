@@ -5,7 +5,7 @@ One command to give Claude Code (and any MCP-aware agent) full Juspay context: s
 ## Install
 
 ```bash
-npm install -g --foreground-scripts https://github.com/sahyll/juspay-skills/releases/download/cli-v0.2.1/juspay-claude-code-skill-0.2.1.tgz
+npm install -g https://github.com/sahyll/juspay-skills/releases/download/cli-v0.2.1/juspay-claude-code-skill-0.2.1.tgz
 juspay-claude
 ```
 
