@@ -1,7 +1,6 @@
 ---
 id: hyper-checkout
 category: CHECKOUT
-type: sdk
 platforms: [android, ios, web, flutter, react-native, cordova, capacitor, iframe-web]
 ---
 

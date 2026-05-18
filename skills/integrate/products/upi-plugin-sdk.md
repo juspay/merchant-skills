@@ -1,7 +1,6 @@
 ---
 id: upi-plugin-sdk
 category: UPI SOLUTIONS
-type: sdk
 platforms: [android, ios, flutter, react-native, cordova]
 ---
 

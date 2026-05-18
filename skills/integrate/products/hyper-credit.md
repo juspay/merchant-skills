@@ -1,7 +1,6 @@
 ---
 id: hyper-credit
 category: CHECKOUT
-type: hybrid
 platforms: [web]
 ---
 

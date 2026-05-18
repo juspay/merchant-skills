@@ -1,7 +1,6 @@
 ---
 id: ec-api
 category: CHECKOUT
-type: api-only
 platforms: []
 ---
 

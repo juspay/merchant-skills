@@ -1,7 +1,6 @@
 ---
 id: jusbiz
 category: PAYOUTS
-type: api-only
 platforms: []
 ---
 

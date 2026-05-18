@@ -6,14 +6,13 @@ description: >
   "set up payments", "add payment SDK", or any variation of setting up a Juspay
   product into their app or codebase. This skill drives a fully guided, doc-driven
   wizard: it reads product summaries locally, probes candidates via MCP, then fetches
-  actual documentation pages and generates complete integration code from what the
-  docs say — not from hardcoded templates. Works for any Juspay product.
+  actual documentation pages and generates complete integration code.
 compatibility:
   tools:
-    - docs-mcp-server (explore_product, doc_fetch_tool)
+    - juspay-docs-mcp (explore_product, doc_fetch_tool)
     - juspay-mcp (juspay_get_merchant_details, juspay_get_webhook_settings, juspay_update_webhook_settings, juspay_get_general_settings, juspay_update_general_settings, juspay_create_api_key)
   mcp_servers:
-    - docs-mcp-server
+    - juspay-docs-mcp
     - juspay-mcp
 ---
 
@@ -22,12 +21,14 @@ compatibility:
 > **PRIME DIRECTIVE:** This file is a decision engine. It contains no product knowledge.
 > Product knowledge lives in `products/`. Authoritative implementation facts come only from MCP tool calls — never from memory or training.
 >
-> **MCP PREFERENCE:** Always prefer `juspay-mcp` tools for live merchant data (credentials, settings, gateway config, integration status). Use `docs-mcp-server` only for documentation structure and page content. Use `rag_tool_juspay` when a specific implementation detail is unclear from fetched docs.
+> **MCP PREFERENCE:** Always prefer `juspay-mcp` tools for live merchant data (credentials, settings, gateway config, integration status). Use `juspay-docs-mcp` only for documentation structure and page content.
 
 ---
 
 ## AGENT SELF-CHECK (run mentally before each phase)
 
+
+- Did I authenticate with `juspay-mcp` before calling any `juspay-mcp` tools? If not, Please trigger the authentication flow now.
 - Did I call `juspay_get_merchant_details` to establish merchant context before asking for credentials?
 - Did I read `products/` before calling `explore_product`? Can I conclude from the catalog alone?
 - Did I scan the codebase before asking disambiguation questions (language, framework)?
@@ -66,7 +67,7 @@ Format choices as structured options, not inline prose.
 
 ### Step 0A — Load product catalog
 
-Read all files in `products/`. Each file has: product ID, type, platforms, use cases, and intent signals.
+Read all files in `products/`. Each file has: product ID, platforms, use cases, and intent signals.
 
 Store the full set as `$PRODUCT_CATALOG`. This is your local knowledge for matching — do not use training-data knowledge about products.
 
@@ -160,8 +161,8 @@ Using `$INTENT` and the `intent signals` field in each `$PRODUCT_CATALOG` entry,
 
 Matching rules:
 
-- "checkout UI", "payment page", "mobile SDK" → prefer `type: sdk` products
-- "API only", "server-side", "REST", "backend" → prefer `type: api-only` products
+- "checkout UI", "payment page", "mobile SDK" → prefer products with runtime platforms (android, ios, web, etc.)
+- "API only", "server-side", "REST", "backend" → prefer products with no runtime platforms
 - "recurring", "subscriptions", "mandates" → billing/mandate products
 - "payout", "transfer", "disburse" → payout products
 - "UPI", "TPAP", "P2P", "P2M" → UPI products
@@ -174,23 +175,22 @@ Aim for 1–3 candidates. Fewer is better.
 
 A catalog entry is **conclusive** if:
 
-- The `type` field unambiguously answers whether a platform question is needed
 - The `platforms` list either matches `$DETECTED_PLATFORM` exactly, or has only one option
 - No further platform disambiguation is required to start code generation
 
 If conclusive → skip `explore_product` for this candidate and proceed.
-If **not** conclusive (e.g. hybrid type, multiple overlapping platforms, need page count for complexity signal) → call:
+If **not** conclusive (e.g. multiple overlapping platforms, need page count for complexity signal) → call:
 
 ```
-docs-mcp-server:explore_product({ product: <candidate-id> })
+juspay-docs-mcp:explore_product({ product: <candidate-id> })
 ```
 
 Extract only what you need for recommendation:
 
 - Product title
-- Platform IDs → classify type (runtime IDs = sdk, only `docs` = api-only, mix = hybrid)
+- Platform IDs — runtime IDs signal a client SDK; `docs` only signals a server API; a mix signals both
 - Number of numbered base integration pages (complexity signal)
-- List of supported platforms if sdk/hybrid
+- List of supported platforms if a client SDK is present
 
 Do not fetch individual doc pages here.
 
@@ -221,7 +221,7 @@ If already called and `$DOC_MAP` is populated → skip directly to Phase 1A.
 Otherwise call:
 
 ```
-docs-mcp-server:explore_product({ product: $PRODUCT })
+juspay-docs-mcp:explore_product({ product: $PRODUCT })
 ```
 
 Read the full response. This is the authoritative doc structure.
@@ -310,10 +310,10 @@ Then follow the `api-only` path, `sdk` path, or both, as appropriate.
 
 ## PHASE 3 — Doc Fetch
 
-**Always use `doc_fetch_tool`. Only fall back to `rag_tool_juspay` if a specific detail is unclear from fetched pages. Only fall back to WebFetch if MCP returns an explicit error on a valid URL.**
+**Always use `doc_fetch_tool`. Only fall back to WebFetch if MCP returns an explicit error on a valid URL.**
 
 ```
-docs-mcp-server:doc_fetch_tool({ url: "<md content link from $DOC_MAP>" })
+juspay-docs-mcp:doc_fetch_tool({ url: "<md content link from $DOC_MAP>" })
 ```
 
 Fetch order:
@@ -331,12 +331,6 @@ While reading each page, extract and store:
 - `$ERROR_CODES` — all status values, error codes, failure reasons
 - `$VERSION_CONSTRAINTS` — min SDK version, min language/platform version
 - `$WARNINGS` — any "note", "important", "warning" callout blocks
-
-If a fetched page leaves a specific field or behaviour unclear, supplement with:
-
-```
-juspay-mcp:rag_tool_juspay({ query: "<specific question about the unclear detail>" })
-```
 
 ---
 
@@ -607,7 +601,7 @@ The integration checklist stages from Phase 6 (New Card, UPI Collect, UPI Intent
 fetch the test resources page for the platform:
 
 ```
-docs-mcp-server:doc_fetch_tool({ url: "<test-resources md content link from $DOC_MAP>" })
+juspay-docs-mcp:doc_fetch_tool({ url: "<test-resources md content link from $DOC_MAP>" })
 ```
 
 Extract:
@@ -642,7 +636,7 @@ If a browser test cannot be completed (Juspay payment page blocks headless brows
 ## TOOL CALL REFERENCE
 
 | When          | Tool                                        | Purpose                                                                                       |
-| ------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| ------------- | ------------------------------------------- | ----------x----------------------------------------------------------------------------------- |
 | Phase 0A      | Read `products/*.md`                        | Load product summaries for intent matching                                                    |
 | Phase 0B      | `juspay_get_merchant_details()`             | Auto-resolve merchant ID, client ID, integration type — infer recommended product             |
 | Phase 0D      | `explore_product(candidate-id)`             | Probe type and platforms before recommending                                                  |

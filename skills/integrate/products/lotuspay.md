@@ -1,7 +1,6 @@
 ---
 id: lotuspay
 category: CHECKOUT
-type: hybrid
 platforms: [web]
 ---
 

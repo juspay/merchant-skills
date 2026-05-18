@@ -1,7 +1,6 @@
 ---
 id: payout
 category: PAYOUTS
-type: api-only
 platforms: []
 ---
 
