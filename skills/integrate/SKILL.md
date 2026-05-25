@@ -9,10 +9,10 @@ description: >
   actual documentation pages and generates complete integration code.
 compatibility:
   tools:
-    - docs-mcp-server (explore_product, doc_fetch_tool)
+    - juspay-docs-mcp (explore_product, doc_fetch_tool)
     - juspay-mcp (juspay_get_merchant_details, juspay_get_webhook_settings, juspay_update_webhook_settings, juspay_get_general_settings, juspay_update_general_settings, juspay_create_api_key)
   mcp_servers:
-    - docs-mcp-server
+    - juspay-docs-mcp
     - juspay-mcp
 ---
 
@@ -21,13 +21,13 @@ compatibility:
 > **PRIME DIRECTIVE:** This file is a decision engine. It contains no product knowledge.
 > Product knowledge lives in `products/`. Authoritative implementation facts come only from MCP tool calls — never from memory or training.
 >
-> **MCP PREFERENCE:** Always prefer `juspay-mcp` tools for live merchant data (credentials, settings, gateway config, integration status). Use `docs-mcp-server` only for documentation structure and page content.
+> **MCP PREFERENCE:** Always prefer `juspay-mcp` tools for live merchant data (credentials, settings, gateway config, integration status). Use `juspay-docs-mcp` only for documentation structure and page content.
 
 ---
 
 ## AGENT SELF-CHECK (run mentally before each phase)
 
-- Did I authenticate with `juspay-mcp` before calling any `juspay-mcp` tools? If not, Please trigger the authentication flow now.
+- Did I complete the PRE-FLIGHT MCP authentication step? If not, trigger `mcp__juspay-mcp__authenticate()` now — or, if it fails, stop and ask the user to authenticate before continuing.
 - Did I call `juspay_get_merchant_details` to establish merchant context before asking for credentials?
 - Did I read `products/` before calling `explore_product`? Can I conclude from the catalog alone?
 - Did I scan the codebase before asking disambiguation questions (language, framework)?
@@ -171,6 +171,29 @@ Format choices as structured options, not inline prose.
 
 ---
 
+## PRE-FLIGHT: MCP AUTHENTICATION
+
+This skill relies on two MCP servers:
+
+- **`juspay-mcp`** — live merchant data (credentials, settings, integration status). Requires authentication before any tool call.
+- **`juspay-docs-mcp`** — documentation structure and page content. No authentication required.
+
+### Authentication flow
+
+Before calling any `juspay-mcp` tool, attempt to trigger the authentication flow using whatever mechanism your agent environment exposes (e.g. an `authenticate` tool, an OAuth handshake, or a login prompt provided by the MCP server).
+
+**If authentication succeeds** → proceed directly to Phase 1.
+
+**If authentication fails, the tool is unavailable, or you are unsure how to authenticate in your environment** → first, consult your own agent's documentation on how to authenticate a remote MCP server (e.g. Claude Code docs, OpenCode docs, Cursor docs — whichever agent you are). Then stop and tell the user:
+
+> "The `juspay-mcp` server needs to be authenticated before this integration can proceed.
+>
+> Please check your agent's documentation on authenticating MCP servers, then re-run the integrate skill to continue."
+
+Do **not** attempt to call any `juspay-mcp` tool before authentication succeeds. Do not proceed to Phase 1 until authentication is confirmed.
+
+---
+
 ## PHASE 1 — Intent Collection and Product Selection
 
 ### STARTUP
@@ -289,7 +312,7 @@ If conclusive → skip `explore_product` for this candidate and proceed.
 If **not** conclusive (e.g. hybrid type, multiple overlapping platforms, need page count for complexity signal) → call:
 
 ```
-docs-mcp-server:explore_product({ product: <candidate-id> })
+juspay-docs-mcp:explore_product({ product: <candidate-id> })
 ```
 
 Extract only what you need for recommendation:
@@ -342,7 +365,7 @@ If already called and `$DOC_MAP` is populated → skip directly to Step 2.3.
 Otherwise call:
 
 ```
-docs-mcp-server:explore_product({ product: $PRODUCT })
+juspay-docs-mcp:explore_product({ product: $PRODUCT })
 ```
 
 Read the full response. This is the authoritative doc structure. Extract and store:
@@ -480,7 +503,7 @@ Run: `integrate-results step-start doc-fetch` | flip `doc-fetch` task to `in_pro
 **Always use `doc_fetch_tool`. Only fall back to WebFetch if MCP returns an explicit error on a valid URL.**
 
 ```
-docs-mcp-server:doc_fetch_tool({ url: "<md content link from $DOC_MAP>" })
+juspay-docs-mcp:doc_fetch_tool({ url: "<md content link from $DOC_MAP>" })
 ```
 
 Fetch order:
@@ -1147,7 +1170,7 @@ Report in Step 8.4 table with type `Constraint`.
 **Step 8.3.1: Fetch test credentials** (all SDK/hybrid products)
 
 ```
-docs-mcp-server:doc_fetch_tool({ url: "<test-resources md content link from $DOC_MAP>" })
+juspay-docs-mcp:doc_fetch_tool({ url: "<test-resources md content link from $DOC_MAP>" })
 ```
 
 Extract:
