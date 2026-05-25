@@ -14,7 +14,11 @@ HTTP_STATUS=$(curl -s -o /tmp/juspay_status_resp.json -w "%{http_code}" "${ENDPO
 
 BODY=$(cat /tmp/juspay_status_resp.json)
 echo "← HTTP ${HTTP_STATUS}"
-echo "${BODY}" | python3 -m json.tool 2>/dev/null || echo "${BODY}"
+if command -v jq &>/dev/null; then
+  echo "${BODY}" | jq . 2>/dev/null || echo "${BODY}"
+else
+  echo "${BODY}" | python3 -m json.tool 2>/dev/null || echo "${BODY}"
+fi
 
 if [ "${HTTP_STATUS}" -eq 200 ]; then
   echo "✅ PASS — status received"

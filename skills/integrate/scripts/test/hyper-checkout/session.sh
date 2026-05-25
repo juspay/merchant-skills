@@ -29,7 +29,11 @@ HTTP_STATUS=$(curl -s -o /tmp/juspay_session_resp.json -w "%{http_code}" -X POST
 
 BODY=$(cat /tmp/juspay_session_resp.json)
 echo "← HTTP ${HTTP_STATUS}"
-echo "${BODY}" | python3 -m json.tool 2>/dev/null || echo "${BODY}"
+if command -v jq &>/dev/null; then
+  echo "${BODY}" | jq . 2>/dev/null || echo "${BODY}"
+else
+  echo "${BODY}" | python3 -m json.tool 2>/dev/null || echo "${BODY}"
+fi
 
 if [ "${HTTP_STATUS}" -eq 200 ]; then
   echo "✅ PASS — session created"
