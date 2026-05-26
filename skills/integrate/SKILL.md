@@ -1,16 +1,14 @@
 ---
 name: integrate
 description: >
-  Execute the /integrate command for LLM agents. Triggers when the user types
-  `/integrate`, `/integrate --product`, or asks to "integrate a Juspay product",
-  "set up payments", "add payment SDK", or any variation of setting up a Juspay
-  product into their app or codebase. This skill drives a fully guided, doc-driven
-  wizard: it reads product summaries locally, probes candidates via MCP, then fetches
-  actual documentation pages and generates complete integration code.
-compatibility:
+  Use when the user types `/integrate`, `/integrate --product`, or asks to "integrate
+  a Juspay product", "set up payments", "add payment SDK", or any variation of adding
+  a Juspay payment product to their app or codebase. Activate for any Juspay payment
+  integration request.
+compatibility: |
   tools:
     - juspay-docs-mcp (explore_product, doc_fetch_tool)
-    - juspay-mcp (juspay_get_merchant_details, juspay_get_webhook_settings, juspay_update_webhook_settings, juspay_get_general_settings, juspay_update_general_settings, juspay_create_api_key)
+    - juspay-mcp (juspay_get_merchant_details, juspay_get_webhook_settings, juspay_get_general_settings, juspay_create_api_key)
   mcp_servers:
     - juspay-docs-mcp
     - juspay-mcp
@@ -118,7 +116,7 @@ Sequential seeding is a regression — emit all `TaskCreate` calls in one turn.
 
 **Auto-skip rules** (these phases get back-to-back `step-start` / `step-end skipped`, and their task goes straight to `completed`):
 
-- `{$PLATFORM}-setup`: skipped when the documentation structure indicates no native SDK setup is needed for the confirmed platform. Infer this from the doc structure — if the product has no native/mobile SDK pages for `$PLATFORM`, skip with an appropriate reason derived from what the docs show. Use the actual resolved platform name in the step (e.g., `step-start web-setup` / `step-end skipped`).
+- `{$PLATFORM}-setup`: skipped when the documentation structure indicates no native SDK setup is needed for the confirmed platform. Infer this from the doc structure — if the product has no native/mobile SDK pages for `$PLATFORM`, skip with a reason stating: `"not applicable: no native/mobile SDK pages found for $PLATFORM in the doc map"`. Use the actual resolved platform name in the step (e.g., `step-start web-setup` / `step-end skipped`).
 
 **`--from <step>` entry points:** seed the 8 STATIC_STEPS, then mark all steps before the entry point as `completed` immediately after seeding. Dynamic steps that would have been created before the entry point should also be seeded and immediately marked `completed`.
 
@@ -401,6 +399,37 @@ Scan the working directory for backend language signals and store as `$DETECTED_
 
 If multiple signals conflict, count source files per language under `server/`, `backend/`, `api/`, or the project root — pick the majority. If none found, leave `$DETECTED_LANG` unset (ask the user in Step 4.3).
 
+### Step 2.2.5 — Single-side codebase check (SDK and hybrid products only)
+
+**Skip this step entirely if `$PRODUCT_TYPE = api-only`.** API-only products have no client side, so the question does not apply.
+
+Scan the working directory for both backend and frontend presence:
+
+**Backend signals**: a dedicated `server/`, `backend/`, or `api/` directory; `package.json` with server-side deps (`express`, `fastify`, `koa`, `hapi`, `nest`); Next.js project with an `app/api/` or `pages/api/` directory; `requirements.txt`, `pyproject.toml`, `go.mod`, `pom.xml`, `build.gradle` (non-Android context), `Gemfile`, `composer.json`, `Cargo.toml`, `*.csproj`.
+
+**Frontend signals**: `package.json` with client-side deps (`react`, `vue`, `angular`, `svelte`, `next`, `nuxt`); `index.html` at the project root; `src/` directory with `*.jsx` / `*.tsx` / `*.vue` files; `pubspec.yaml` (Flutter); `AndroidManifest.xml` or `*.xcodeproj` (native mobile).
+
+Set `$HAS_BACKEND` and `$HAS_FRONTEND` from the scan.
+
+If **both are present** → set `$SINGLE_SIDE_MODE = false` and continue.
+
+If **only one side is found** → set `$SINGLE_SIDE_MODE = true` and `$MISSING_SIDE` to the absent side (`"backend"` or `"frontend"`). Then ask the user before proceeding:
+
+> "⚠️ I can only find a **[$HAS_BACKEND → "backend" / $HAS_FRONTEND → "frontend"]** in this project. A complete **[Product]** integration normally requires both:
+>
+> - **Backend** — session creation, order-status check, webhook handler
+> - **Frontend** — SDK initialisation and payment UI
+>
+> How would you like to proceed?
+>
+> 1. **Continue with the [$FOUND_SIDE] only** — I'll generate what's needed for this side; the integration summary will include a step-by-step checklist of what must be implemented on the [$MISSING_SIDE] before going live
+> 2. **Stop — I'll add the [$MISSING_SIDE] first, then re-run `/integrate`**"
+
+- **Option 1** → proceed with `$SINGLE_SIDE_MODE = true`
+- **Option 2** → stop immediately with the message: _"No problem. Add the [$MISSING_SIDE] to your project and re-run `/integrate` when you're ready."_
+
+If **neither** side is found (empty or unfamiliar project structure) → treat as both-present and continue; the codebase scan later phases will surface any issues.
+
 Branch on `$PRODUCT_TYPE`:
 
 ### If `api-only`
@@ -420,6 +449,8 @@ Flip `platform-detect` task to `completed`.
 - `checklist` — always
 
 ### If `sdk`
+
+Detect the client platform from the codebase and confirm with the user before continuing.
 
 ### Step 2.3 — Detect platform from codebase
 
@@ -479,7 +510,7 @@ Ask first:
 > 2. **Client SDK only**
 > 3. **Both**"
 
-Then follow the `api-only` path, `sdk` path, or both, as appropriate.
+Then follow the `api-only` path if option 1 was selected, the `sdk` path if option 2, or both paths sequentially if option 3.
 
 ```
 integrate-results set platform $PLATFORM
@@ -581,71 +612,108 @@ If the docs do not mention webhooks, skip the webhook check and configuration en
 
 First, scan the codebase for an existing webhook handler (e.g. `api/juspay/webhook`, `api/webhook`, `webhooks` route). If one exists, note its path as `$WEBHOOK_PATH`.
 
-Then ask the user:
-
-> "No webhook URL is configured. Your app has a webhook handler at `$WEBHOOK_PATH`.
-> Please provide your deployed base URL so I can set it to `https://<your-domain>/$WEBHOOK_PATH`.
->
-> If you don't have a deployed URL yet, you can:
->
-> - Run `ngrok http <port>` locally to get a temporary public URL
-> - Leave this for now and configure it on the Juspay dashboard before going live"
-
-Do **not** set a placeholder URL (e.g. `https://www.webhook.com`) — only call `juspay_update_webhook_settings` if the user provides a real, publicly reachable HTTPS URL that routes to the webhook handler.
-
-**Seed `webhook-config` dynamic task** now (the user needs to provide a URL, so surface it as a tracked task):
+**Seed `webhook-config` dynamic task** now:
 
 ```
 TaskCreate({ name: "webhook-config", description: "Configure webhook URL for payment events" })
 integrate-results step-start webhook-config
 ```
 
-Once a valid URL is provided, call:
+**Fetch dashboard docs** to get accurate navigation and direct links. Call:
 
 ```
-juspay-mcp:juspay_update_webhook_settings({
-  webHookurl: <base-url> + "/" + <$WEBHOOK_PATH>,
-  webhookEvents: <merge existing $WEBHOOK_EVENTS with standard events for this product>
-})
+juspay-docs-mcp:explore_product({ product: "dashboard" })
 ```
 
-After updating, confirm what was set:
+If `explore_product` succeeds, find the page whose title contains "Webhook" or "Settings" and fetch it:
 
-> "Webhook URL set to `<url>`. The following events are now enabled:
+```
+juspay-docs-mcp:doc_fetch_tool({ url: "<webhook/settings page URL from explore_product result>" })
+```
+
+If `explore_product` fails or returns no result, fall back to:
+
+```
+juspay-docs-mcp:list_products({ category: "DASHBOARD" })
+```
+
+Pick the dashboard product slug from the result, call `explore_product` on it, then `doc_fetch_tool` on the relevant page. Store the fetched page as `$DASHBOARD_DOCS` — the return URL step reuses it.
+
+From the fetched page extract:
+- `$WEBHOOK_DOCS_URL` — the URL of the fetched docs page (for reference)
+- `$WEBHOOK_DASHBOARD_NAV` — any dashboard navigation path mentioned in the page (e.g. "Settings → Webhooks")
+- `$WEBHOOK_DASHBOARD_LINK` — any direct dashboard deep-link found in the page. If no direct link is found, leave this empty and rely on the navigation instructions.
+- `$WEBHOOK_EVENTS_REQUIRED` — standard webhook event names recommended for this product
+
+Ask the user for their deployed base URL (needed to compute the full webhook URL):
+
+> "No webhook URL is configured on your account. Please provide your deployed base URL so I can show you exactly what to set in the dashboard.
 >
-> - `EVENT_NAME_1`
-> - `EVENT_NAME_2`
-> - _(list every event where the value is `true` in the updated config)_"
+  > If you don't have a deployed URL yet, you can use `ngrok http <port>` or `cloudflared tunnel` to get a temporary public URL."
 
-Store the final URL as `$WEBHOOK_URL`.
+Once the user provides a base URL, compute `$CONFIGURED_WEBHOOK_URL` = `<user-provided base URL>` + `/` + `$WEBHOOK_PATH` and present the configuration instructions:
+
+> "**Configure your webhook in the Juspay dashboard:**"
+
+> **URL to set:** `$CONFIGURED_WEBHOOK_URL`
+>
+> **Navigation:** $WEBHOOK_DASHBOARD_NAV _(from docs)_
+> **Direct link:** $WEBHOOK_DASHBOARD_LINK _(if available)_
+>
+> **Events to enable:**
+> - _(list each event from `$WEBHOOK_EVENTS_REQUIRED`)_
+>
+> 📖 Configuration guide: $WEBHOOK_DOCS_URL
+>
+> Let me know once you've saved the settings and I'll continue."
+
+Wait for the user to confirm the webhook is configured. Store the confirmed URL as `$WEBHOOK_URL`.
 
 ```
-integrate-results step-end passed "webhook URL configured: $WEBHOOK_URL"
+integrate-results step-end passed "webhook URL configured manually via dashboard: $WEBHOOK_URL; navigation instructions provided"
 ```
 
 Flip `webhook-config` task to `completed`.
 
 **If `$RETURN_URL` is empty or not configured:**
 
-First, scan the codebase for an existing return URL page or handler that can receive the Juspay redirect and handle order status response. If one exists, note its path and use that when asking the user.
+First, scan the codebase for an existing return URL page or handler that can receive the Juspay redirect and handle order status response. If one exists, note its path as `$RETURN_PATH`.
 
-Ask the user:
-
-> "No return URL is configured for your account. Please provide the URL customers should be redirected to after payment completes. This must be a real route in your app that can handle the payment return/order status response."
-
-After the user provides a URL, validate that it matches an existing route or handler in the codebase.
-
-- If it matches, call:
+**Fetch dashboard settings docs.** If `$DASHBOARD_DOCS` is already set from the webhook step above, reuse it. Otherwise call:
 
 ```
-juspay-mcp:juspay_update_general_settings({ returnUrl: <user-provided URL> })
+juspay-docs-mcp:explore_product({ product: "dashboard" })
 ```
 
-- If it does not match, warn the user:
+find the general settings page, and fetch it with `doc_fetch_tool`. Fall back to `list_products({ category: "DASHBOARD" })` if `explore_product` fails.
+
+From the fetched page extract:
+- `$SETTINGS_DOCS_URL` — URL of the fetched docs page
+- `$SETTINGS_DASHBOARD_NAV` — navigation path for general settings (e.g. "Settings → General")
+- `$SETTINGS_DASHBOARD_LINK` — direct dashboard deep-link if available
+
+Ask the user for the return URL:
+
+> "No return URL is configured for your account. Please provide the URL customers should be redirected to after payment completes. This must be a real route in your app that handles the payment return/order status response."
+
+After the user provides a URL, validate that it matches an existing route or handler in the codebase. If it does not match, warn:
 
 > "The URL you provided does not appear to exist in the current codebase as a return handler. Are you sure you want to use this?"
 
-Store the final URL as `$RETURN_URL`.
+Once confirmed, present the configuration instructions:
+
+> "**Configure your return URL in the Juspay dashboard:**
+>
+> **URL to set:** `<user-provided URL>`
+>
+> **Navigation:** $SETTINGS_DASHBOARD_NAV _(from docs)_
+> **Direct link:** $SETTINGS_DASHBOARD_LINK _(if available)_
+>
+> 📖 Configuration guide: $SETTINGS_DOCS_URL
+>
+> Let me know once you've saved the settings."
+
+Wait for the user to confirm. Store the confirmed URL as `$RETURN_URL`.
 
 **Environment is always production.** Do not ask the user. Use production host URLs from the docs.
 
@@ -931,7 +999,7 @@ Detect the project workflow from the codebase before running anything:
 | `config.xml`                                               | Cordova — use `cordova platform add`         |
 | `capacitor.config.*`                                       | Capacitor — use `npx cap sync`               |
 
-For managed workflows where native directories do not yet exist: run the appropriate generate/sync command **only if `$PREBUILD_REQUIRED` is true or the framework mandates it**. Never run a destructive generate command on a repo that already has native directories.
+For managed workflows where native directories do not yet exist: run the framework's generate/sync command (e.g. `npx expo prebuild` for Expo managed, `npx cap sync` for Capacitor, `flutter pub get` for Flutter) **only if `$PREBUILD_REQUIRED` is true or the framework mandates it**. Never run a destructive generate command on a repo that already has native directories.
 
 ### Step 6.3 — Execute build tool changes
 
@@ -1419,6 +1487,18 @@ Juspay statuses mapped to app-internal statuses in the webhook handler and order
 
 ---
 
+## Other-Side TODO _(only present when `$SINGLE_SIDE_MODE = true`)_
+
+> This section is written **only** when Step 2.2.5 detected a single-side codebase and the user chose to continue with one side. Omit it entirely if both sides were present.
+>
+> **Do not hardcode any steps here.** Every checklist item must be derived from the docs fetched in Phase 3. Walk `$DOC_MAP` for `$MISSING_SIDE`-facing sections (e.g. sections labelled "Backend", "Server", "API" if `$MISSING_SIDE = backend`; sections labelled "Frontend", "Client", "SDK", platform names if `$MISSING_SIDE = frontend`). For each page in those sections, extract the required actions and emit one checklist item per distinct action, using the exact names from `$CODE_EXAMPLES` and `$CONSTRAINTS`.
+
+### What must be implemented on the [$MISSING_SIDE] before go-live
+
+[One checklist item per required action from the $MISSING_SIDE-facing doc sections in $DOC_MAP. Group items under the same section headings used in the docs. Use exact method/field/file names from $CODE_EXAMPLES and $CONSTRAINTS — no invented names.]
+
+---
+
 ## Notes
 
 [Non-obvious decisions, workarounds, known caveats, or anything a future developer would need to know. Do not include credential values. Examples: why a particular status mapping was chosen, a version constraint from the docs, a quirk of the SDK init flow, etc.]
@@ -1506,8 +1586,9 @@ Flip `done` task to `completed`.
 | Phase 3       | `doc_fetch_tool(url)`                       | Fetch individual doc pages; build `$CONSTRAINTS` table with types, maxLength, minValue, etc.  |
 | Step 4.1      | `juspay_get_webhook_settings()`             | Check if webhook URL is already configured                                                    |
 | Step 4.1      | `juspay_get_general_settings()`             | Check if return URL is already configured                                                     |
-| Step 4.1      | `juspay_update_webhook_settings(...)`       | Configure webhook URL if not already set                                                      |
-| Step 4.1      | `juspay_update_general_settings(...)`       | Configure return URL if not already set                                                       |
+| Step 4.1      | `explore_product("dashboard")`              | Primary: get dashboard doc structure to find webhook/settings pages                           |
+| Step 4.1      | `doc_fetch_tool(url)`                       | Fetch the webhook or general-settings page from the dashboard product; store as `$DASHBOARD_DOCS` |
+| Step 4.1      | `list_products({ category: "DASHBOARD" })`  | Fallback if `explore_product("dashboard")` fails — find the correct dashboard product slug    |
 | Step 4.2      | `juspay_create_api_key(...)`                | Provision a new API key; store in memory only — never log or store in results file            |
 | Step 5.1      | `juspay_integration_monitoring_status(...)` | Fetch integration stage contract into `$INTEGRATION_STAGES`; drives which flows codegen must cover |
 | Step 8.5      | `juspay_integration_monitoring_status(...)` | Re-call after tests to confirm stage activity recorded; diff against `$INTEGRATION_STAGES` baseline |
@@ -1528,6 +1609,23 @@ Flip `done` task to `completed`.
 | Fallback only | WebFetch                                    | Only if `doc_fetch_tool` returns an error on a valid URL                                      |
 
 **Never construct doc URLs yourself.** All URLs come from the `md content link` field in `explore_product` responses.
+
+---
+
+## Output
+
+Each phase produces structured output in the conversation:
+
+- **Phase 1** — Numbered product recommendation with confirmed `$PRODUCT`
+- **Phase 2** — Detected platform confirmation with confirmed `$PLATFORM`
+- **Phase 3** — Silent (doc pages fetched; `$CONSTRAINTS`, `$ERROR_CODES`, `$CODE_EXAMPLES` stored)
+- **Phase 4** — One-line confirmation per auto-resolved setting; questions only for missing values
+- **Phase 5** — Generated code blocks: validation layer, API routes, webhook handler, order-status utility, optional DB schema
+- **Phase 6** (mobile only) — Native setup summary table with ✅ / ❌ / skipped per step
+- **Phase 7** — Markdown integration checklist + parameter constraints table + error reference table
+- **Phase 8** — Unified pass/fail test results table; manual SDK test guide for mobile platforms
+- **Phase 9** — Summary file written to `[docs|memory-bank|notes|juspay-integration]/[product]-[YYYY-MM-DD].md`
+- **Done** — Timing table with per-phase durations and 2–3 concrete optimization suggestions
 
 ---
 
