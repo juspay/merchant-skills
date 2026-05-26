@@ -780,6 +780,7 @@ Run: `integrate-results step-start codegen` | flip `codegen` task to `in_progres
 - Use code examples and method names from fetched docs as the base. Substitute collected values. Do not use method or class names you did not see in the docs.
 - Every visible, non-disabled stage in `$INTEGRATION_STAGES` (Step 5.1) must have corresponding code coverage. Cover critical stages first.
 - Every constrained field in `$CONSTRAINTS` (Phase 3) must pass through the validation layer before it reaches the API. No parameter bypasses its documented bounds.
+- **Before generating frontend/SDK code**, re-read `products/$PRODUCT.md` for any platform-specific or integration-type-specific code instructions. Every such instruction section must be applied exactly as written when generating code for the matching platform or integration type.
 
 ### Step 5.1 — Fetch integration stages
 
