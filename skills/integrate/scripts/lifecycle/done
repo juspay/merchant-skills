@@ -63,6 +63,12 @@ def fmt_dur(s):
 
 steps = data.get("steps", [])
 
+# Manifest completeness: registered steps that never reached a terminal record
+# (excluding `done`, which is necessarily in flight while this summary runs).
+_recorded_names = {s.get("name", "") for s in steps}
+incomplete = [s.get("name", "") for s in data.get("manifest", [])
+              if s.get("name", "") != "done" and s.get("name", "") not in _recorded_names]
+
 total_start = steps[0]["startedAt"]  if steps else data.get("startedAt", "")
 total_end   = steps[-1]["completedAt"] if steps else data.get("startedAt", "")
 total_start_epoch = iso_to_epoch(total_start) if total_start else 0
@@ -107,6 +113,10 @@ for step in steps:
     verif_clean = verif.replace("\n", " ").replace("|", "\\|")
     rows.append("| {} | {} | {} | {} |".format(name, icon, dur_str, verif_clean))
 
+if incomplete:
+    sys.stdout.write("> ⚠️ **INCOMPLETE** — registered step(s) never executed: {}\n\n".format(
+        ", ".join(incomplete)))
+
 sys.stdout.write("| Step | Status | Duration | Verification |\n")
 sys.stdout.write("|------|--------|----------|---------------|\n")
 for row in rows:
@@ -129,6 +139,7 @@ sys.stdout.write("slowestSeconds={}\n".format(slowest_dur))
 sys.stdout.write("dominantSteps={}\n".format(",".join(dominant)))
 sys.stdout.write("skippedSteps={}\n".format(",".join(skipped)))
 sys.stdout.write("failedSteps={}\n".format(",".join(failed)))
+sys.stdout.write("incompleteSteps={}\n".format(",".join(incomplete)))
 sys.stdout.write("product={}\n".format(product))
 sys.stdout.write("platform={}\n".format(platform))
 sys.stdout.write("productType={}\n".format(productType))
@@ -210,6 +221,14 @@ done < <(
   $JQ -r '.steps[] | [.name, .status, .startedAt, .completedAt, (.verification // ""), (.reason // "")] | @tsv' "$FILE"
 )
 
+# Manifest completeness: registered steps that never reached a terminal record
+# (excluding `done`, which is necessarily in flight while this summary runs).
+incomplete_csv="$($JQ -r '(([.manifest[]?.name] - [.steps[]?.name] - ["done"]) // []) | join(",")' "$FILE")"
+if [ -n "$incomplete_csv" ]; then
+  echo "> ⚠️ **INCOMPLETE** — registered step(s) never executed: $(echo "$incomplete_csv" | sed 's/,/, /g')"
+  echo
+fi
+
 echo "| Step | Status | Duration | Verification |"
 echo "|------|--------|----------|--------------|"
 for row in "${rows[@]}"; do
@@ -235,6 +254,7 @@ echo "slowestSeconds=$slowest_dur"
 echo "dominantSteps=$(join_csv "${dominant[@]+${dominant[@]}}")"
 echo "skippedSteps=$(join_csv "${skipped[@]+${skipped[@]}}")"
 echo "failedSteps=$(join_csv "${failed[@]+${failed[@]}}")"
+echo "incompleteSteps=$incomplete_csv"
 echo "product=$product"
 echo "platform=$platform"
 echo "productType=$productType"

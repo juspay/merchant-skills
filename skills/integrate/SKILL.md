@@ -7,8 +7,8 @@ description: >
   integration request.
 compatibility: |
   tools:
-    - juspay-docs-mcp (explore_product, doc_fetch_tool)
-    - juspay-mcp (juspay_get_merchant_details, juspay_get_webhook_settings, juspay_get_general_settings, juspay_create_api_key)
+    - juspay-docs-mcp (explore_product, doc_fetch_tool, list_products)
+    - juspay-mcp (authenticate, juspay_get_merchant_details, juspay_get_webhook_settings, juspay_get_general_settings, juspay_create_api_key, juspay_integration_monitoring_status)
   mcp_servers:
     - juspay-docs-mcp
     - juspay-mcp
@@ -25,7 +25,8 @@ compatibility: |
 
 ## AGENT SELF-CHECK (run mentally before each phase)
 
-- Did I complete the PRE-FLIGHT MCP authentication step? If not, trigger `mcp__juspay-mcp__authenticate()` now — or, if it fails, stop and ask the user to authenticate before continuing.
+- Did I complete the PRE-FLIGHT MCP authentication step? If not, trigger your agent's `juspay-mcp` authentication mechanism now (see PRE-FLIGHT) — or, if it fails, stop and ask the user to authenticate before continuing.
+- Has the `plan` step run and registered the manifest? Every step I run must be one the manifest holds; I must not skip a registered step without closing it (`step-end skipped "<reason>"`). The `done` phase hard-fails on any unaccounted step.
 - Did I call `juspay_get_merchant_details` to establish merchant context before asking for credentials?
 - Did I read `products/` before calling `explore_product`? Can I conclude from the catalog alone?
 - Did I scan the codebase before asking disambiguation questions (language, framework)?
@@ -39,11 +40,11 @@ compatibility: |
 
 Extract flags before starting:
 
-| Flag              | Effect                                                                                                   |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| Flag              | Effect                                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `--product <id>`  | Skip recommendation. Confirm the product in one line, then go to Phase 2. Still run Step 1.7 catalog-first check. |
-| `--platform <id>` | Hint for platform selection in Phase 2 — still verify against codebase before asking.                    |
-| `--from <step>`   | Resume from a specific step (see Entry Points). Seed the full task list; mark preceding steps completed. |
+| `--platform <id>` | Hint for platform selection in Phase 2 — still verify against codebase before asking.                             |
+| `--from <step>`   | Resume from a specific step (see Entry Points). Seed the full task list; mark preceding steps completed.          |
 
 ---
 
@@ -51,36 +52,39 @@ Extract flags before starting:
 
 Every phase is bookended by two `scripts/lifecycle/integrate-results` calls: `step-start <name>` before the work begins, and `step-end <status> "<verification>"` after verification. This is what keeps per-phase timing accurate — collapsing both into a single end-of-phase call produces zero-second durations.
 
-**Script path** (invoke with the full path from the project root):
-`.claude/skills/integrate/scripts/lifecycle/integrate-results`
+**Script path** — the script lives at `scripts/lifecycle/integrate-results` **relative to this skill's own directory**, not the user's project root. When the skill is installed under `.claude/skills/integrate/`, that resolves to `.claude/skills/integrate/scripts/lifecycle/integrate-results`; when run from this repo directly it is `skills/integrate/scripts/lifecycle/integrate-results`. Resolve the path against wherever this `SKILL.md` is located before invoking — do not assume `.claude/`.
 
 **Commands:**
 
-- `init` — initialize the workflow lifecycle skeleton. Echoes `init: startedAt=<ts>`. Call once at workflow start (before task seeding).
-- `step-start <name>` — call at the top of each phase before any work. Echoes `pending: <name>`.
-- `step-end <status> "<verification>" ["<reason>"]` — call after the phase verifies. Echoes `recorded: <name> <status> (steps=<count>, pending=<none|name>)`.
-- `step <name> <status> "<verification>" <startedAt> <completedAt> ["<reason>"]` — single-call form for phases where start time was captured in shell.
-- `set <field> <value>` — store non-sensitive metadata. Echoes `set: <field>=<value>`. **The script structurally refuses fields matching `*key*`, `*secret*`, `*password*`, `*token*` (case-insensitive) — do not try to work around this.**
+- `init` — initialize the workflow lifecycle skeleton and seed the **bootstrap manifest** (`product-select`, `platform-detect`, `plan`). Echoes `init: startedAt=<ts>`. Call once at workflow start.
+- `register <steps.json>` — merge the planner's run manifest (a JSON array of steps) into the lifecycle file. Echoes `registered: <new> steps (manifest=<total>)`. Called once, by the `plan` step (see SUB-AGENTS & RUN MANIFEST). **Rejects (exit 1)** any step name outside the closed vocabulary, a malformed array, or a manifest missing a required phase step.
+- `step-start <name>` — call at the top of each step before any work. Echoes `pending: <name>`. **Rejects (exit 1) any `<name>` not in the manifest** — you cannot start a step the planner didn't register.
+- `step-end <status> "<verification>" ["<reason>"]` — call after the step verifies. `<status>` ∈ `passed|failed|skipped`. **A `skipped` status requires a non-empty `<reason>` (3rd arg)** — a silent skip is rejected. Echoes `recorded: <name> <status> (steps=<count>, pending=<none|name>)`.
+- `step <name> <status> "<verification>" <startedAt> <completedAt> ["<reason>"]` — single-call form for phases where start time was captured in shell. Same name-in-manifest and skip-reason rules apply.
+- `set <field> <value>` — store non-sensitive metadata. Echoes `set: <field>=<value>`. **The script structurally refuses fields matching `*key*`, `*secret*`, `*password*`, `*token*` (case-insensitive) — do not try to work around this.** `set status completed` is **refused (exit 1)** while any registered step has no terminal record.
+- `finalize` — completeness check: echoes `complete: all manifest steps recorded` (exit 0) or `incomplete: <names>` (exit 1) when a registered step (other than `done`) was never executed. Run by the DONE phase before declaring success.
 
 **Safe fields to `set`:** `product`, `platform`, `productType`, `merchantId`, `active`, `status`.
 
 **Trust the echo.** Every mutation echoes a one-line confirmation. Treat that as proof the write succeeded; do not re-read the JSON to verify.
 
-**If `integrate-results` or `scripts/lifecycle/done` exits with code 2** and prints a line starting with `SKILL_FALLBACK:`, neither `jq` nor Python is available. Skip all remaining `integrate-results` calls without retrying, skip the timing summary in the DONE phase, and inform the user once: "Result tracking is unavailable (no `jq` or Python found). Install either to enable per-phase timing. The integration itself will proceed normally."
+**If `integrate-results` or `scripts/lifecycle/done` exits with code 2** and prints a line starting with `SKILL_FALLBACK:`, neither `jq` nor Python is available. Skip all remaining `integrate-results` calls without retrying, skip the timing summary in the DONE phase, and inform the user once: "Result tracking is unavailable (no `jq` or Python found). Install either to enable per-phase timing and step-completeness enforcement. The integration itself will proceed normally." Note that **without a JSON processor the manifest gate cannot run**, so step-skip protection is off in that environment — be extra careful to follow every phase in order.
 
-**STATIC_STEPS (seeded at init, always present):** `product-select`, `platform-detect`, `doc-fetch`, `params`, `codegen`, `test`, `summary`, `done`
+### The run manifest replaces static/dynamic step seeding
 
-**DYNAMIC_STEPS (seeded mid-workflow as discovered):**
+The step list is **not** something you maintain in your head or seed ad-hoc as you go. It is a **manifest** computed once, up front, and enforced by the script:
 
-- After Phase 2 (platform confirmed): `{$PLATFORM}-setup` (if mobile platform), `checklist` (always)
-- After Step 4.1 (webhook check): `webhook-config` (if webhook URL was unconfigured and user provides one)
-- After Phase 5 DB scan (DB changes confirmed): `db-schema`
+1. `init` seeds a **bootstrap manifest**: `product-select`, `platform-detect`, `plan`.
+2. The `plan` step (after platform detection) runs the **integration-planner** sub-agent, which emits a run-specific `steps.json`, and you `register` it. The manifest now contains every step this run will execute.
+3. From then on, `step-start`/`step-end` only accept names that are in the manifest, and `finalize` / `set status completed` fail while any registered step is unaccounted for.
 
-Dynamic step names are platform-specific: `react-native-setup`, `android-setup`, `ios-setup`, `flutter-setup`, `cordova-setup`, `capacitor-setup`. The `done` script handles arbitrary step names — no script changes needed.
+This is what makes a skipped step a **loud failure** instead of a silent omission. See **SUB-AGENTS & RUN MANIFEST** for the full flow and the closed step vocabulary the planner draws from.
 
 **Discipline:**
 
-- Bookend every phase with `step-start` at the top and `step-end` at the bottom. Never call `step-end` without a prior `step-start`. Back-to-back `step-start` / `step-end skipped` is allowed for auto-skipped phases.
+- Bookend every step with `step-start` at the top and `step-end` at the bottom. Never call `step-end` without a prior `step-start`. Only one step may be pending at a time.
+- A step you don't perform must still be **closed explicitly**: `step-end skipped "<verification>" "<reason>"`. Absence is a hard fail; a reasoned skip is fine.
+- Never invent step names. If a name isn't in the manifest, `step-start` will reject it — that means the planner didn't register it; do not work around it.
 - Never compute timestamps yourself — `integrate-results` resolves UTC internally.
 - Verification strings must be credential-free (see SECURITY below).
 
@@ -90,37 +94,93 @@ Dynamic step names are platform-specific: `react-native-setup`, `android-setup`,
 
 Drive the agent’s native checklist or task-tracking UI so the user can see a live view of integration progress throughout the workflow.
 
-**At workflow start** (after `integrate-results init`, before Step 1.1), seed **the 8 STATIC_STEPS in parallel in a single assistant turn** — one `TaskCreate` call per task, all emitted as parallel `tool_use` blocks:
+> **Agent-capability gate:** This section assumes your agent exposes a task/checklist tool (e.g. `TaskCreate`/`TaskUpdate` in Claude Code). **If your agent has no such UI, skip every `TaskCreate` and task-flip instruction in this skill** — they are presentation only. The `integrate-results` lifecycle calls (`step-start`/`step-end`) are the source of truth for progress and timing and must always run regardless. Wherever a phase says "flip `<step>` task to `<state>`", treat that as a no-op when no task UI exists.
 
-```
-product-select, platform-detect, doc-fetch, params, codegen, test, summary, done
-```
+**The task list mirrors the manifest** — it is presentation; the manifest is the source of truth. Seed tasks in two waves matching the manifest's two stages:
 
-Sequential seeding is a regression — emit all `TaskCreate` calls in one turn.
+**Wave 1 — at workflow start** (after `integrate-results init`, before Step 1.1): seed the **3 bootstrap steps** in parallel in a single assistant turn — `product-select`, `platform-detect`, `plan` — one `TaskCreate` per step. Sequential seeding is a regression; emit all calls in one turn.
 
-**After Phase 2 (platform confirmed):** seed dynamic tasks in a single parallel batch:
+**Wave 2 — right after `register`** (the `plan` step): seed one task per **newly registered** manifest step, in a single parallel turn, reading the names straight from the manifest you just registered. Do not hand-maintain this list — it comes from the planner's `steps.json`.
 
-- `{$PLATFORM}-setup` — if `$PLATFORM` ∈ `{android, ios, react-native, flutter, cordova, capacitor}`
-- `checklist` — always
-
-**On-demand (later phases):**
-
-- After Step 4.1 webhook check: seed `webhook-config` task if URL was unconfigured and user provides one
-- After Phase 5 DB scan confirmed: seed `db-schema` task if user agrees to schema changes
-
-**State machine at each phase boundary:**
+**State machine at each step boundary:**
 
 - Flip to `in_progress` when `step-start` is called.
-- Flip to `completed` when `step-end passed` is called.
-- One phase `in_progress` at a time.
+- Flip to `completed` when `step-end passed` **or** `step-end skipped` is called (a reasoned skip is a completed task; surface the reason).
+- One step `in_progress` at a time.
 
-**Auto-skip rules** (these phases get back-to-back `step-start` / `step-end skipped`, and their task goes straight to `completed`):
+**Auto-skip** still happens via `step-end skipped "<verification>" "<reason>"` for steps whose guard resolves false at runtime (e.g. `web-setup` when the doc map has no native SDK pages for the platform). The step stays in the manifest and is closed with a reason — never dropped.
 
-- `{$PLATFORM}-setup`: skipped when the documentation structure indicates no native SDK setup is needed for the confirmed platform. Infer this from the doc structure — if the product has no native/mobile SDK pages for `$PLATFORM`, skip with a reason stating: `"not applicable: no native/mobile SDK pages found for $PLATFORM in the doc map"`. Use the actual resolved platform name in the step (e.g., `step-start web-setup` / `step-end skipped`).
+**`--from <step>` entry points:** see ENTRY POINTS → _Resume State Reconstruction_. The manifest is re-established first; steps before the entry point are closed (`step-end passed "resumed from --from flag"`) and their tasks flipped to `completed`.
 
-**`--from <step>` entry points:** seed the 8 STATIC_STEPS, then mark all steps before the entry point as `completed` immediately after seeding. Dynamic steps that would have been created before the entry point should also be seeded and immediately marked `completed`.
+**Failure:** if a phase exhausts retries and the workflow halts, leave the failing step `in_progress`, run the failure summary, and call `integrate-results set status failed` (not `completed` — that would be refused anyway while steps are unaccounted for).
 
-**Failure:** if a phase exhausts retries and the workflow halts, leave the failing phase `in_progress`, mark `done` completed after the failure summary, and call `integrate-results set status failed`.
+---
+
+## SUB-AGENTS & RUN MANIFEST
+
+This skill is large, and weaker/faster models lose the thread and silently skip steps. Two mechanisms counter that: a **planner-computed run manifest** that the script enforces for completeness, and **read-only retrieval sub-agents** that keep context-heavy lookups out of the orchestrator's working memory.
+
+### The run manifest (anti-skip contract)
+
+```
+init  →  bootstrap manifest [product-select, platform-detect, plan]
+         ├─ product-select     (interactive: $PRODUCT, merchant context)
+         ├─ platform-detect     (interactive: $PLATFORM, $PRODUCT_TYPE, $DOC_MAP)
+         └─ plan                → integration-planner emits steps.json
+                                → integrate-results register steps.json   (manifest now complete)
+         ├─ <every manifest step, in order — step-start / step-end records a terminal state>
+         └─ done                → integrate-results finalize   (HARD FAIL if any step unaccounted for)
+```
+
+`product-select` and `platform-detect` are inherently interactive and run **before** the planner, so they live in the bootstrap manifest. The `plan` step expands the manifest with the run-specific remainder. A step may legitimately resolve to `skipped` **with a reason** at runtime (its guard turned out false); what is forbidden is a registered step being **absent** at `finalize`.
+
+### Closed step vocabulary
+
+The planner may emit **only** these names (the script's `register` rejects anything else):
+
+- **Structural / phase:** `product-select`, `platform-detect`, `plan`, `doc-fetch`, `codegen`, `checklist`, `test`, `summary`, `done`
+- **Native setup (one, platform-specific):** `android-setup`, `ios-setup`, `react-native-setup`, `flutter-setup`, `cordova-setup`, `capacitor-setup`, `web-setup`, `iframe-web-setup`
+- **Interaction / decision gates (first-class, so a dropped question is caught):** `platform-disambiguation`, `params-collect`, `apikey-provision`, `webhook-config`, `return-url-config`, `db-schema-decision`, `integration-stages`, `stages-confirm`
+
+A well-formed manifest always contains at least `doc-fetch`, `codegen`, `test`, `summary`, `done` (the script enforces this on `register`).
+
+### Capability gate (delegate vs inline)
+
+> **If your agent exposes a sub-agent / task-spawn mechanism** (e.g. Claude Code's Task tool, an Explore-style agent), run each sub-agent below as a separate read-only agent and consume its returned contract. **If it does not**, perform the identical work inline in the main context using the same input → output contract. Either way, the manifest registration and completeness enforcement are **not optional** — they are script-driven and run regardless. Where your harness supports per-agent model override, route these workers to a stronger model than a cheap orchestrator.
+>
+> **On Claude Code specifically**, these are real subagents defined as `.claude/agents/<name>.md` (installed to `~/.claude/agents/`). **Invoke each one explicitly via the Task tool by `name` at the exact manifest step** — e.g. _"Use the docs-fetcher subagent with mode=constraints to fetch and extract …"_. Do not rely on automatic delegation; their `description` fields are written to discourage it so steps fire only when the workflow says. Inputs are passed in the invocation prompt; the subagent returns its JSON contract as its final message (the `integration-planner` additionally writes `steps.json` to disk for `register`).
+
+**Rules for every retrieval sub-agent:** read-only; **no user interaction inside it** (asking stays in the orchestrator); returns a strict structured contract; the orchestrator **validates the contract and `step-end failed` + halts the owning step if the output is empty/thin** (a thin result is itself a caught error, not something to paper over).
+
+### Sub-agent registry
+
+| Sub-agent                            | Input                                                                                                                                              | Output contract (validate before proceeding)                                                     | Owns step / used at                          |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------- | ------------------------------------- |
+| `integration-planner`                | `$PRODUCT`, `$PRODUCT_TYPE`, `$PLATFORM`, `$DOC_MAP`, `hasExistingOrderSchema`, `products/$PRODUCT.md`, the closed vocabulary above                | ordered `steps.json`: `[{name, guard, terminal[], critical}]` using only closed-vocabulary names | `plan`                                       |
+| `docs-fetcher` mode `doc-map`        | product / candidate id                                                                                                                             | `$DOC_MAP` (platforms, sections, pages, md-content links), title, classified `$PRODUCT_TYPE`     | Step 1.7 / Step 2.1                          |
+| `docs-fetcher` mode `constraints`    | ordered doc page URLs (the Phase 3 fetch order)                                                                                                    | `$CONSTRAINTS` table + `$CODE_EXAMPLES` + `$ERROR_CODES` + `$VERSION_CONSTRAINTS` + `$WARNINGS`  | `doc-fetch`                                  |
+| `docs-fetcher` mode `dashboard-nav`  | `webhook` \| `general-settings`                                                                                                                    | `{docsUrl, dashboardNav, dashboardLink                                                           | null, eventsRequired[]}`                     | `webhook-config`, `return-url-config` |
+| `docs-fetcher` mode `test-resources` | test-resources md-content link                                                                                                                     | `$TEST_CARDS`, `$TEST_UPI_VPA`, `$DUMMY_PG_FLOWS`                                                | `test` (Step 8.3.1)                          |
+| `codebase-scanner`                   | mode: `backend-lang` \| `platform` \| `single-side` \| `existing-schemas` \| `backend-base-url` \| `webhook-handler-path` \| `return-handler-path` | verdict + evidence (the signal files matched)                                                    | Steps 2.2, 2.2.5, 2.3, 4.1, 4.4, plan, 5.3.1 |
+| `integration-stages-fetcher`         | platform, product_integrated, merchant_id, time window                                                                                             | `$INTEGRATION_STAGES[]` + `$SCORE_BASELINE` (filtered per the Step 5.1 traversal rules)          | `integration-stages`, `stages-confirm`       |
+
+`docs-fetcher` is one read-only agent with a `mode` argument (it talks to `juspay-docs-mcp`); `codebase-scanner` is the filesystem one; `integration-stages-fetcher` is the merchant-monitoring one. The biggest context wins are `docs-fetcher` mode `constraints` (many full doc pages in, one table out) and `integration-stages-fetcher` (large nested response, small filtered subset out). The **present-to-user and wait-for-confirmation shell always stays in the orchestrator**; only the fetch/search/extract core is delegated.
+
+### The `plan` step
+
+Runs once, immediately after `platform-detect` confirms `$PLATFORM` (see Phase 2). Procedure:
+
+1. Ensure `$DOC_MAP` exists (built by `docs-fetcher` mode `doc-map` in Step 2.1).
+2. Run `integration-planner` with the inputs above → receive `steps.json`.
+3. Validate it is a non-empty array of closed-vocabulary names; then `integrate-results register steps.json`. If `register` exits non-zero, the manifest was malformed — fix the planner output and retry; do not proceed without a registered manifest.
+4. Seed Wave-2 tasks from the registered manifest (see PROGRESS TRACKING).
+
+```
+integrate-results step-start plan
+# ...run integration-planner, write steps.json, register it...
+integrate-results register steps.json
+integrate-results step-end passed "manifest registered: $(count) steps for $PRODUCT/$PLATFORM"
+```
 
 ---
 
@@ -198,11 +258,11 @@ Do **not** attempt to call any `juspay-mcp` tool before authentication succeeds.
 
 Before any phase work, run these **in order**:
 
-1. `integrate-results init` — initialize the lifecycle skeleton
-2. Emit all 8 `TaskCreate` calls **in parallel in a single assistant turn** (see PROGRESS TRACKING)
+1. `integrate-results init` — initialize the lifecycle skeleton and seed the bootstrap manifest (`product-select`, `platform-detect`, `plan`)
+2. Emit the **3 bootstrap** `TaskCreate` calls (`product-select`, `platform-detect`, `plan`) **in parallel in a single assistant turn** (see PROGRESS TRACKING — the rest of the tasks are seeded after `register` in the `plan` step)
 3. `integrate-results set active working`
 
-**If `--from <step>` was passed**, after seeding tasks, mark all steps before the entry point as `completed` immediately (back-to-back `step-start` / `step-end passed "resumed from --from flag"` for each preceding step, then flip those tasks to `completed`).
+**If `--from <step>` was passed**, follow ENTRY POINTS → _Resume State Reconstruction_: re-establish the manifest first, then close every step before the entry point (`step-end passed "resumed from --from flag"`) and flip those tasks to `completed`.
 
 ---
 
@@ -232,11 +292,11 @@ Extract and store:
 
 Map `$INTEGRATION_TYPE` to a recommended product:
 
-| `$INTEGRATION_TYPE`         | Recommended product ID                       |
-| --------------------------- | -------------------------------------------- |
-| `PP`                        | `hyper-checkout`                             |
-| `ec_sdk`                    | `ec-headless`                                |
-| `ec_api`                    | `ec-api`                                     |
+| `$INTEGRATION_TYPE`         | Recommended product ID               |
+| --------------------------- | ------------------------------------ |
+| `PP`                        | `hyper-checkout`                     |
+| `ec_sdk`                    | `ec-headless`                        |
+| `ec_api`                    | `ec-api`                             |
 | _(anything else or absent)_ | No inference — fall back to Step 1.4 |
 
 ### Step 1.3 — Present inferred recommendation
@@ -356,6 +416,8 @@ Run: `integrate-results step-start platform-detect` | flip `platform-detect` tas
 
 ### Step 2.1 — Build $DOC_MAP (explore_product)
 
+**Delegate to the `docs-fetcher` sub-agent, mode `doc-map`** (or inline) — it calls `explore_product`, extracts the structure below, classifies `$PRODUCT_TYPE`, and returns `$DOC_MAP`. This is the read-heavy lookup that feeds the planner, so keeping the raw `explore_product` dump out of the orchestrator's context is worthwhile. Validate `$DOC_MAP` is non-empty before continuing.
+
 **Only call `explore_product` if it wasn't already called in Step 1.7 for `$PRODUCT`.**
 
 If already called and `$DOC_MAP` is populated → skip directly to Step 2.3.
@@ -382,6 +444,8 @@ integrate-results set productType $PRODUCT_TYPE
 ```
 
 ### Step 2.2 — Detect backend language from codebase
+
+> The codebase scans in this phase and later (backend language here, platform in Step 2.3, single-side in Step 2.2.5, existing schemas in Step 5.3.1, backend base URL in Step 4.4, webhook/return handler paths in Step 4.1) are all fan-out file searches that fit the **`codebase-scanner` sub-agent** (one invocation per `mode`). Delegate when supported — it returns a verdict plus the signal files it matched; otherwise scan inline. Each returns data only; any user question stays in the orchestrator.
 
 Scan the working directory for backend language signals and store as `$DETECTED_LANG`. Use the first unambiguous match:
 
@@ -442,11 +506,7 @@ integrate-results set nativeSdkRequired false
 integrate-results step-end passed "api-only product; backend language: $DETECTED_LANG"
 ```
 
-Flip `platform-detect` task to `completed`.
-
-**Seed Wave 2 dynamic tasks** (in parallel, single turn):
-
-- `checklist` — always
+Flip `platform-detect` task to `completed`. Continue to **PLAN** below — the planner produces the full remaining manifest; do not seed tasks manually here.
 
 ### If `sdk`
 
@@ -479,11 +539,11 @@ If the user confirms, skip to disambiguation. If they choose option 2, or if no 
 
 ### Step 2.4 — Disambiguation
 
-Apply after platform is confirmed:
+Resolve **only what determines `$PLATFORM` itself** here — the planner needs the final platform:
 
-- Android: ask Java vs Kotlin
-- iOS: ask Swift vs Objective-C, CocoaPods vs SPM
-- Web: if both `web` and `iframe-web` are in the doc map, ask which variant
+- Web: if both `web` and `iframe-web` are in the doc map, ask which variant (this choice _is_ `$PLATFORM`).
+
+The **language/toolchain variant** for native platforms (Android Java vs Kotlin; iOS Swift vs Obj-C, CocoaPods vs SPM) is **not** asked here — it doesn't change `$PLATFORM` and is deferred to the registered `platform-disambiguation` step (Step 5.0), which the planner registers for native platforms so the question can't be silently dropped.
 
 Store as `$PLATFORM`. Filter `$DOC_MAP` to the chosen platform's pages.
 
@@ -493,12 +553,7 @@ integrate-results set nativeSdkRequired true
 integrate-results step-end passed "platform confirmed: $PLATFORM; doc map filtered to platform pages"
 ```
 
-Flip `platform-detect` task to `completed`.
-
-**Seed Wave 2 dynamic tasks** (in parallel, single turn):
-
-- `{$PLATFORM}-setup` (e.g., `react-native-setup`) — create `TaskCreate` with the resolved platform name
-- `checklist` — always
+Flip `platform-detect` task to `completed`. Continue to **PLAN** below — the planner registers `{$PLATFORM}-setup`, `checklist`, and the rest of the manifest; do not seed tasks manually here.
 
 ### If `hybrid`
 
@@ -518,18 +573,40 @@ integrate-results set nativeSdkRequired <true|false>
 integrate-results step-end passed "hybrid product; mode=$MODE; platform=$PLATFORM"
 ```
 
-Flip `platform-detect` task to `completed`.
+Flip `platform-detect` task to `completed`. Continue to **PLAN** below — the planner registers the manifest for the chosen mode(s); do not seed tasks manually here.
 
-**Seed Wave 2 dynamic tasks** (in parallel, single turn):
+---
 
-- `{$PLATFORM}-setup` — if `$PLATFORM` is mobile (android/ios/react-native/flutter/cordova/capacitor)
-- `checklist` — always
+## PLAN — Build and register the run manifest
+
+`plan` is the third bootstrap step. It runs once, here, now that `$PRODUCT`, `$PRODUCT_TYPE`, `$PLATFORM`, and `$DOC_MAP` are all resolved. It turns "the step list" from something you improvise into a contract the script enforces (see SUB-AGENTS & RUN MANIFEST).
+
+Run: `integrate-results step-start plan` | flip `plan` task to `in_progress`
+
+1. Confirm `$DOC_MAP` is populated (built by `docs-fetcher` mode `doc-map` in Step 2.1). If not, build it now.
+2. **Determine `hasExistingOrderSchema`** — scan the codebase for an existing payment/order schema (delegate to `codebase-scanner` mode `existing-schemas`, or inline). This drives whether the planner registers `db-schema-decision`; pass the boolean to the planner.
+3. Run the **`integration-planner`** sub-agent (delegate if your agent supports it; otherwise inline) with: `$PRODUCT`, `$PRODUCT_TYPE`, `$PLATFORM`, `$DOC_MAP`, `hasExistingOrderSchema`, the contents of `products/$PRODUCT.md`, and the closed step vocabulary. It writes `./steps.json` **and** returns the same array in its final message.
+   - The planner is **conservative**: it includes a step only when real work is likely (e.g. `webhook-config` only if the docs have a webhooks section; `platform-disambiguation` only for native `android`/`ios`; `db-schema-decision` only when persistence is needed AND `hasExistingOrderSchema` is false). It omits genuinely-inapplicable steps rather than registering them just to skip — a manifest full of "skipped" steps is noise.
+4. **Locate `./steps.json` in the current working directory** — the project root where `.integrate-results.json` lives, **not** the skill directory. If it is not there, take the JSON array from the planner's final message and write it to `./steps.json` yourself. Do **not** re-invoke the planner to "find" the file. Then register it:
+
+```
+integrate-results register ./steps.json
+integrate-results step-end passed "manifest registered: $(count) steps for $PRODUCT/$PLATFORM"
+```
+
+If `register` succeeds, the manifest is set — **do not run the planner again** (a second run would generate a different manifest and double-register). If `register` exits non-zero, the manifest was invalid (unknown name, malformed, or missing a required phase step) — fix the array and re-register the same file; only re-invoke the planner if the array itself is wrong. **Do not proceed to Phase 3 without a successfully registered manifest.**
+
+5. Flip `plan` task to `completed`, then **seed Wave-2 tasks** from the registered manifest (one `TaskCreate` per newly registered step, single parallel turn — see PROGRESS TRACKING).
+
+From here, every step you run must be one the manifest registered, and the DONE phase's `finalize` will hard-fail if any registered step was never executed.
 
 ---
 
 ## PHASE 3 — Doc Fetch
 
 Run: `integrate-results step-start doc-fetch` | flip `doc-fetch` task to `in_progress`
+
+**Delegate to the `docs-fetcher` sub-agent, mode `constraints`** (or inline) — this is the single biggest context win: it `doc_fetch_tool`s the pages in the order below, reads them in full, and returns `$CONSTRAINTS`, `$CODE_EXAMPLES`, `$ERROR_CODES`, `$VERSION_CONSTRAINTS`, and `$WARNINGS` — so the full page text never enters the orchestrator's context, only the extracted tables. Validate `$CONSTRAINTS` and `$CODE_EXAMPLES` are populated before continuing; if a required page failed to load, `step-end failed` and surface the URL rather than proceeding with empty constraints.
 
 **Always use `doc_fetch_tool`. Only fall back to WebFetch if MCP returns an explicit error on a valid URL.**
 
@@ -547,7 +624,7 @@ Fetch order:
 
 While reading each page, extract and store:
 
-- `$CONSTRAINTS` — per-field structured table (replaces the old `$PARAMS` list). For every request field, method param, or constructor arg found:
+- `$CONSTRAINTS` — per-field structured table. For every request field, method param, or constructor arg found:
   - `name` — exact field name from docs
   - `type` — declared type: `String | Integer | Decimal | Boolean | Array | Object`
   - `required` — `true | false`
@@ -575,13 +652,13 @@ Flip `doc-fetch` task to `completed`.
 
 ## PHASE 4 — Parameter Collection
 
-Run: `integrate-results step-start params` | flip `params` task to `in_progress`
+Phase 4 is **several registered gate steps**, not one — each gets its own `step-start`/`step-end` bookend so a dropped question becomes a hard fail at `finalize`. The steps the planner registered from this phase's vocabulary: `webhook-config` (only if the docs have a webhooks section), `return-url-config`, `apikey-provision`, `params-collect`. Run each that is in the manifest; for any whose work turns out unnecessary at runtime (e.g. already configured), close it with `step-end skipped "<reason>"` — never leave it unstarted.
 
 Tell the user:
 
 > "I've read the documentation. I'll collect what I need."
 
-### Step 4.1 — Auto-resolve merchant context via MCP
+### Step 4.1 — Auto-resolve merchant context via MCP (shared prep)
 
 `$MERCHANT_ID`, `$CLIENT_ID`, and `$INTEGRATION_TYPE` were already fetched in Step 1.2 — reuse those values. Do not call `juspay_get_merchant_details()` again.
 
@@ -612,12 +689,17 @@ If the docs do not mention webhooks, skip the webhook check and configuration en
 
 First, scan the codebase for an existing webhook handler (e.g. `api/juspay/webhook`, `api/webhook`, `webhooks` route). If one exists, note its path as `$WEBHOOK_PATH`.
 
-**Seed `webhook-config` dynamic task** now:
+> **Greenfield note:** On a first-time integration the webhook handler does not exist yet — it is generated in Phase 5. If the scan finds no handler, set `$WEBHOOK_PATH` to the route the codegen step _will_ create (the conventional path for this product/framework, e.g. `/api/juspay/webhook`) and treat it as the planned path. Never emit a URL containing an empty or undefined path segment. When you reach Phase 5, generate the webhook handler at exactly this path so the dashboard value the user configured stays correct.
+
+Begin the registered `webhook-config` step:
 
 ```
-TaskCreate({ name: "webhook-config", description: "Configure webhook URL for payment events" })
 integrate-results step-start webhook-config
 ```
+
+> If `juspay_get_webhook_settings` reported `$WEBHOOK_URL` already configured, close the step now — `step-end skipped "webhook already configured: $WEBHOOK_URL"` — and skip the rest of this block. The planner registered the step; resolve it, don't drop it.
+
+**Delegate the dashboard-docs lookup to the `docs-fetcher` sub-agent, mode `dashboard-nav`** (`target=webhook`); it returns `{docsUrl, dashboardNav, dashboardLink, eventsRequired[]}`. Validate the result is non-empty before presenting; if it comes back empty, `step-end failed` and surface the raw docs URL. **Inline fallback** (no sub-agent support) — perform the lookup yourself:
 
 **Fetch dashboard docs** to get accurate navigation and direct links. Call:
 
@@ -640,6 +722,7 @@ juspay-docs-mcp:list_products({ category: "DASHBOARD" })
 Pick the dashboard product slug from the result, call `explore_product` on it, then `doc_fetch_tool` on the relevant page. Store the fetched page as `$DASHBOARD_DOCS` — the return URL step reuses it.
 
 From the fetched page extract:
+
 - `$WEBHOOK_DOCS_URL` — the URL of the fetched docs page (for reference)
 - `$WEBHOOK_DASHBOARD_NAV` — any dashboard navigation path mentioned in the page (e.g. "Settings → Webhooks")
 - `$WEBHOOK_DASHBOARD_LINK` — any direct dashboard deep-link found in the page. If no direct link is found, leave this empty and rely on the navigation instructions.
@@ -649,18 +732,19 @@ Ask the user for their deployed base URL (needed to compute the full webhook URL
 
 > "No webhook URL is configured on your account. Please provide your deployed base URL so I can show you exactly what to set in the dashboard.
 >
-  > If you don't have a deployed URL yet, you can use `ngrok http <port>` or `cloudflared tunnel` to get a temporary public URL."
+> If you don't have a deployed URL yet, you can use `ngrok http <port>` or `cloudflared tunnel` to get a temporary public URL."
 
-Once the user provides a base URL, compute `$CONFIGURED_WEBHOOK_URL` = `<user-provided base URL>` + `/` + `$WEBHOOK_PATH` and present the configuration instructions:
+Once the user provides a base URL, compute `$CONFIGURED_WEBHOOK_URL` = `<user-provided base URL>` + `$WEBHOOK_PATH` (the planned or existing path from the scan above — never empty), normalising so there is exactly one `/` at the join. Present the configuration instructions:
 
 > "**Configure your webhook in the Juspay dashboard:**"
 
 > **URL to set:** `$CONFIGURED_WEBHOOK_URL`
 >
-> **Navigation:** $WEBHOOK_DASHBOARD_NAV _(from docs)_
-> **Direct link:** $WEBHOOK_DASHBOARD_LINK _(if available)_
+> **Navigation:** $WEBHOOK*DASHBOARD_NAV *(from docs)_
+> **Direct link:** $WEBHOOK_DASHBOARD_LINK _(if available)\_
 >
 > **Events to enable:**
+>
 > - _(list each event from `$WEBHOOK_EVENTS_REQUIRED`)_
 >
 > 📖 Configuration guide: $WEBHOOK_DOCS_URL
@@ -675,11 +759,19 @@ integrate-results step-end passed "webhook URL configured manually via dashboard
 
 Flip `webhook-config` task to `completed`.
 
+Begin the registered `return-url-config` step:
+
+```
+integrate-results step-start return-url-config
+```
+
+> If `$RETURN_URL` came back already configured from `juspay_get_general_settings`, close it now — `step-end skipped "return URL already configured: $RETURN_URL"` — and skip the rest of this block.
+
 **If `$RETURN_URL` is empty or not configured:**
 
-First, scan the codebase for an existing return URL page or handler that can receive the Juspay redirect and handle order status response. If one exists, note its path as `$RETURN_PATH`.
+First, scan the codebase (delegate to `codebase-scanner` mode `return-handler-path`, or inline) for an existing return URL page or handler that can receive the Juspay redirect and handle order status response. If one exists, note its path as `$RETURN_PATH`.
 
-**Fetch dashboard settings docs.** If `$DASHBOARD_DOCS` is already set from the webhook step above, reuse it. Otherwise call:
+**Delegate the dashboard-settings lookup to the `docs-fetcher` sub-agent, mode `dashboard-nav`** (`target=general-settings`); validate non-empty before presenting. **Inline fallback** — if `$DASHBOARD_DOCS` is already set from the webhook step above, reuse it; otherwise call:
 
 ```
 juspay-docs-mcp:explore_product({ product: "dashboard" })
@@ -688,6 +780,7 @@ juspay-docs-mcp:explore_product({ product: "dashboard" })
 find the general settings page, and fetch it with `doc_fetch_tool`. Fall back to `list_products({ category: "DASHBOARD" })` if `explore_product` fails.
 
 From the fetched page extract:
+
 - `$SETTINGS_DOCS_URL` — URL of the fetched docs page
 - `$SETTINGS_DASHBOARD_NAV` — navigation path for general settings (e.g. "Settings → General")
 - `$SETTINGS_DASHBOARD_LINK` — direct dashboard deep-link if available
@@ -696,9 +789,12 @@ Ask the user for the return URL:
 
 > "No return URL is configured for your account. Please provide the URL customers should be redirected to after payment completes. This must be a real route in your app that handles the payment return/order status response."
 
-After the user provides a URL, validate that it matches an existing route or handler in the codebase. If it does not match, warn:
+After the user provides a URL, check whether its path matches an existing route or handler in the codebase. Two cases:
 
-> "The URL you provided does not appear to exist in the current codebase as a return handler. Are you sure you want to use this?"
+- **Greenfield (no matching route yet):** this is expected on a first-time integration — the return handler is generated in Phase 5. Do **not** warn. Record the path as `$RETURN_PATH` and generate the handler at exactly that path in Phase 5 so the configured value stays correct.
+- **Existing codebase with a conflicting route:** if the codebase already has return/redirect handlers and the provided URL matches none of them, warn:
+
+  > "The URL you provided doesn't match any existing return handler in your codebase, and you already have other routes defined. I'll create a handler at this path in the code-generation step — confirm this is the path you want, or give me one that matches an existing route."
 
 Once confirmed, present the configuration instructions:
 
@@ -706,8 +802,8 @@ Once confirmed, present the configuration instructions:
 >
 > **URL to set:** `<user-provided URL>`
 >
-> **Navigation:** $SETTINGS_DASHBOARD_NAV _(from docs)_
-> **Direct link:** $SETTINGS_DASHBOARD_LINK _(if available)_
+> **Navigation:** $SETTINGS*DASHBOARD_NAV *(from docs)_
+> **Direct link:** $SETTINGS_DASHBOARD_LINK _(if available)\_
 >
 > 📖 Configuration guide: $SETTINGS_DOCS_URL
 >
@@ -715,11 +811,29 @@ Once confirmed, present the configuration instructions:
 
 Wait for the user to confirm. Store the confirmed URL as `$RETURN_URL`.
 
-**Environment is always production.** Do not ask the user. Use production host URLs from the docs.
+```
+integrate-results step-end passed "return URL configured via dashboard: $RETURN_URL"
+```
 
-### Step 4.2 — Auto-provision API key
+Flip `return-url-config` task to `completed`.
 
-Do not ask the user for an API key. Instead, call:
+**Environment is always production.** Do not ask the user. Use production host URLs from the docs. Juspay registers integration-checklist stages only when real transactions flow through a live account, so testing (Phase 8) runs against production using Juspay's Dummy PG simulator (test cards/VPAs).
+
+**Disclose this posture once**, before provisioning the API key:
+
+> "Heads up: this integration runs against your **production** Juspay account. I'll provision a production API key and run test transactions through Juspay's Dummy PG simulator (no real money moves, but the key and activity are on your live account). Continue?"
+
+Wait for confirmation before Step 4.2.
+
+### Step 4.2 — Provision API key (only if one isn't already available)
+
+Begin the registered `apikey-provision` step: `integrate-results step-start apikey-provision`.
+
+**Check for an existing key first — do not create a new key on every run.** Calling `juspay_create_api_key` unconditionally proliferates keys on the merchant's production account, especially across `--from` re-runs. In order:
+
+1. If `$API_KEY` is already set in memory this session → reuse it; skip creation.
+2. Otherwise scan the project's `.env` / `.env.local` for an existing `JUSPAY_API_KEY` (or the env-var name this product's docs use). If present and non-empty → load it into `$API_KEY` in memory and inform the user: _"Using the existing API key from your `.env`."_ Skip creation.
+3. Only if neither exists, create a new one:
 
 ```
 juspay-mcp:juspay_create_api_key({ description: "integrate-skill-<product>-<date>" })
@@ -731,13 +845,26 @@ Store the returned plaintext value as `$API_KEY` **in memory only — never log 
 
 **Never display the key value to the user. Never pass it to `integrate-results`.**
 
+Close the step (credential-free verification only):
+
+```
+integrate-results step-end passed "API key resolved (provisioned or reused from env); stored in memory only"
+```
+
+Flip `apikey-provision` task to `completed`.
+
 ### Step 4.3 — Collect remaining required params
 
-Ask in order:
+Begin the registered `params-collect` step: `integrate-results step-start params-collect`.
 
-1. **Required params** — each required field the user must supply (skip auto-generated fields and anything already resolved: $MERCHANT_ID, $CLIENT_ID, $API_KEY, $WEBHOOK_URL)
-2. **Platform version check** (SDK path only) — if docs specify a minimum version
-3. **Backend language** — if not already detected from codebase
+**Do not assume or invent param values, and do not proceed with only the merchant/client ID.** The transcript failure mode is closing this step having collected almost nothing. Drive it from the docs:
+
+1. **Build the elicitation list from `$CONSTRAINTS`.** Take every field where `required = true`, then remove the ones with an automatic source (`$MERCHANT_ID`, `$CLIENT_ID`, `$API_KEY`, `$WEBHOOK_URL`, `$RETURN_URL`, and anything you generate per-transaction like `order_id`/`amount` that the _app_ supplies at runtime). What remains is the set of values **the user must provide now** (e.g. business config, fixed identifiers, currency, environment-specific IDs the docs call for).
+2. **Ask for each remaining field via the native question UI**, one structured prompt — never free-text guesses, never silent defaults. If a field has a documented default or `enumValues`, present those as choices.
+3. **Platform version check** (SDK path only) — if docs specify a minimum version.
+4. **Backend language** — if not already detected from codebase.
+
+**Closing rule:** `params-collect` is `passed` only when every elicited field has a real value (from the user or a confirmed auto-source). If the user declines to provide a required value, record `step-end skipped "<which fields the user deferred>"` — do **not** record `passed` while required fields are unfilled, and do **not** fabricate them. The verification string must name what was actually collected (e.g. `"collected: currency=INR, businessId=…; 0 outstanding required fields"`), not a vague "confirmed".
 
 ### Step 4.4 — Resolve backend base URL and webhook auth credentials
 
@@ -765,26 +892,43 @@ Store as `$BACKEND_BASE_URL`.
 **Sandbox note:** The test scripts in Step 8.2 call your local backend, which in turn calls Juspay's API with your configured credentials. To test with Juspay's Dummy PG (simulator), no extra setup is needed — the test resources page (fetched in Step 8.3.1) lists test cards and UPI VPAs that route to the simulator automatically.
 
 ```
-integrate-results step-end passed "webhook configured: $WEBHOOK_URL; return URL set; API key provisioned; backend URL: $BACKEND_BASE_URL"
+integrate-results step-end passed "params collected; backend URL: $BACKEND_BASE_URL; webhook auth read from env"
 ```
 
-Flip `params` task to `completed`.
+Flip `params-collect` task to `completed`.
 
 ---
 
 ## PHASE 5 — Code Generation
 
-Run: `integrate-results step-start codegen` | flip `codegen` task to `in_progress`
+Phase 5 is **four registered steps**, run in order, each its own bookend (never nest one inside another — only one step may be pending at a time): `platform-disambiguation` (native platforms only, if registered), `integration-stages`, `codegen`, `db-schema-decision`.
 
-**Rules:**
-- Use code examples and method names from fetched docs as the base. Substitute collected values. Do not use method or class names you did not see in the docs.
-- Every visible, non-disabled stage in `$INTEGRATION_STAGES` (Step 5.1) must have corresponding code coverage. Cover critical stages first.
-- Every constrained field in `$CONSTRAINTS` (Phase 3) must pass through the validation layer before it reaches the API. No parameter bypasses its documented bounds.
-- **Before generating frontend/SDK code**, re-read `products/$PRODUCT.md` for any platform-specific or integration-type-specific code instructions. Every such instruction section must be applied exactly as written when generating code for the matching platform or integration type.
+### Step 5.0 — Platform disambiguation (only if the manifest registered it)
+
+The planner registers `platform-disambiguation` **only when `$PLATFORM` is exactly `android` or `ios`** — the native language/toolchain choice. It is **not** registered for `react-native`, `flutter`, `cordova`, `capacitor`, `web`, `iframe-web`, or `api-only` (a cross-platform framework has no Java-vs-Kotlin question, and the `web` vs `iframe-web` choice was already settled in Step 2.4 since it _is_ `$PLATFORM`). If `platform-disambiguation` is **not** in the manifest, skip straight to Step 5.1 — do not invent it.
+
+```
+integrate-results step-start platform-disambiguation
+```
+
+Ask the variant questions that apply, then store the resolved variant:
+
+- Android: Java vs Kotlin
+- iOS: Swift vs Objective-C, CocoaPods vs SPM
+
+```
+integrate-results step-end passed "platform variant resolved: <e.g. android/kotlin>"
+```
+
+Flip `platform-disambiguation` task to `completed`.
 
 ### Step 5.1 — Fetch integration stages
 
-Call `juspay_integration_monitoring_status` to discover which payment flows Juspay expects this integration to cover. The result becomes `$INTEGRATION_STAGES` — a second constraint source that drives codegen alongside `$CONSTRAINTS` from Phase 3.
+This is the registered `integration-stages` step. Begin it: `integrate-results step-start integration-stages`.
+
+**Delegate to the `integration-stages-fetcher` sub-agent** (or inline) — it calls `juspay_integration_monitoring_status`, walks the nested response per the rules below, and returns `$INTEGRATION_STAGES[]` + `$SCORE_BASELINE`. Validate the result is non-empty before continuing; if the call fails, `step-end failed` and surface the error rather than proceeding with no stage contract.
+
+`juspay_integration_monitoring_status` discovers which payment flows Juspay expects this integration to cover. The result becomes `$INTEGRATION_STAGES` — a second constraint source that drives codegen alongside `$CONSTRAINTS` from Phase 3.
 
 ```
 juspay-mcp:juspay_integration_monitoring_status({
@@ -798,22 +942,22 @@ juspay-mcp:juspay_integration_monitoring_status({
 
 **Product mapping for `product_integrated`:**
 
-| $PRODUCT | product_integrated |
-| --- | --- |
+| $PRODUCT       | product_integrated   |
+| -------------- | -------------------- |
 | hyper-checkout | Payment Page Session |
-| ec-headless | EC + SDK |
-| ec-api | EC Only |
-| *(others)* | Payment Page Session |
+| ec-headless    | EC + SDK             |
+| ec-api         | EC Only              |
+| _(others)_     | Payment Page Session |
 
 **Platform mapping for `platform`:**
 
-| $PLATFORM | platform |
-| --- | --- |
-| web, iframe-web | Web |
-| android | Android |
-| ios | IOS |
-| flutter, react-native, cordova, capacitor | Android |
-| api-only products | Backend |
+| $PLATFORM                                 | platform |
+| ----------------------------------------- | -------- |
+| web, iframe-web                           | Web      |
+| android                                   | Android  |
+| ios                                       | IOS      |
+| flutter, react-native, cordova, capacitor | Android  |
+| api-only products                         | Backend  |
 
 **Traversal path** — the response is nested; walk it as follows:
 
@@ -827,28 +971,47 @@ queryData.responseData.features
 ```
 
 For every stage reached by this walk, include it in `$INTEGRATION_STAGES[]` if:
+
 - `visibilityResult === true`
 - `disableStage === false`
 - `onlyReportResult === false` (reporting-only stages don't need code coverage — skip them)
 
 Each entry in `$INTEGRATION_STAGES[]` stores:
 
-| Field | Source | Notes |
-| --- | --- | --- |
-| `section` | `{sectionKey}` | dict key, e.g. `"Payments Flow Checklist"` — this IS the display name |
-| `stageKey` | `{stageKey}` | dict key, e.g. `"new_card_txn"` |
-| `stageDisplayName` | `stage.stageDisplayName` | human name, e.g. `"New Card"` |
-| `stageDescription` | `stage.stageDescription` | what to test |
-| `criticalResult` | `stage.criticalResult` | boolean — critical stages gate go-live |
-| `status` | `stage.status` | `"PASSED"` \| `"FAILED"` \| `"NOT_ATTEMPTED"` — baseline for Step 8.5 diff |
+| Field              | Source                   | Notes                                                                      |
+| ------------------ | ------------------------ | -------------------------------------------------------------------------- |
+| `section`          | `{sectionKey}`           | dict key, e.g. `"Payments Flow Checklist"` — this IS the display name      |
+| `stageKey`         | `{stageKey}`             | dict key, e.g. `"new_card_txn"`                                            |
+| `stageDisplayName` | `stage.stageDisplayName` | human name, e.g. `"New Card"`                                              |
+| `stageDescription` | `stage.stageDescription` | what to test                                                               |
+| `criticalResult`   | `stage.criticalResult`   | boolean — critical stages gate go-live                                     |
+| `status`           | `stage.status`           | `"PASSED"` \| `"FAILED"` \| `"NOT_ATTEMPTED"` — baseline for Step 8.5 diff |
 
 Also store `queryData.scoreData` as `$SCORE_BASELINE`:
+
 - `baseCriticalSuccessCount` / `baseCriticalTotalCount` — e.g. `4 / 8`
 - `baseTotalSuccessCount` / `baseTotalCount` — e.g. `4 / 12`
 
 **These stages are the integration contract.** Every stage in `$INTEGRATION_STAGES` must have corresponding code coverage in the steps below. Stages where `criticalResult: true` must be covered before non-critical ones.
 
-### Step 5.2 — Emit validation layer from $CONSTRAINTS
+```
+integrate-results step-end passed "fetched $(count) integration stages; baseline $(critical)/$(total) critical passing"
+```
+
+Flip `integration-stages` task to `completed`.
+
+### Step 5.2 — Code generation
+
+Now begin the registered `codegen` step: `integrate-results step-start codegen` | flip `codegen` task to `in_progress`.
+
+**Rules:**
+
+- Use code examples and method names from fetched docs as the base. Substitute collected values. Do not use method or class names you did not see in the docs.
+- Every visible, non-disabled stage in `$INTEGRATION_STAGES` (Step 5.1) must have corresponding code coverage. Cover critical stages first.
+- Every constrained field in `$CONSTRAINTS` (Phase 3) must pass through the validation layer before it reaches the API. No parameter bypasses its documented bounds.
+- **Before generating frontend/SDK code**, re-read `products/$PRODUCT.md` for any platform-specific or integration-type-specific code instructions. Every such instruction section must be applied exactly as written when generating code for the matching platform or integration type.
+
+#### Step 5.2.1 — Emit validation layer from $CONSTRAINTS
 
 Before writing any integration code, generate a validation helper/function derived from `$CONSTRAINTS`:
 
@@ -860,7 +1023,7 @@ Before writing any integration code, generate a validation helper/function deriv
 
 This validation layer is written once and referenced throughout the integration code.
 
-### Step 5.3 — Install SDK dependencies (SDK / hybrid products only)
+#### Step 5.2.2 — Install SDK dependencies (SDK / hybrid products only)
 
 Before writing any code that imports the SDK, install the packages the docs require.
 Use the exact package names and versions stated in the Prerequisites / Getting Started page — do not install anything not mentioned there.
@@ -872,81 +1035,97 @@ Use the exact package names and versions stated in the Prerequisites / Getting S
 | Native Android                         | Add to `build.gradle` `dependencies` block   |
 | Native iOS                             | Add to `Podfile` then run `pod install`      |
 
-Generate in order:
+#### Step 5.2.3 — Generate integration code
+
+Generate in this order:
 
 1. **Auth / credentials setup** — use environment variables, never hardcode values
 2. **Core integration** — API call or SDK install → init → open → response handler
 3. **Webhook handler** — if docs have a webhooks section; include signature verification
 4. **Status verification utility** — if docs have a status/order API
-5. **DB schema** — Follow this flow strictly; do not write or suggest schema changes without completing every step:
+5. **Error handling** — use error codes from the docs to show how to handle different cases
 
-   **Step 5.4 — Scan for existing schemas**
+DB schema is **not** part of this step — it is the separate `db-schema-decision` step (Step 5.3 below), run after `codegen` closes, so the two never overlap as pending steps.
 
-   Search the codebase for payment- or order-related DB definitions:
-   - Migration files (`migrations/`, `db/migrate/`, `*.sql`, `*.prisma`, `schema.rb`, `typeorm/*.entity.*`, `mongoose` model files, etc.)
-   - ORM model files that contain fields like `order_id`, `payment_status`, `transaction_id`, `amount`, or similar
+#### Step 5.2.4 — Build gate (mandatory before closing codegen)
 
-   Collect every match as `$EXISTING_SCHEMAS`.
+**`codegen` is not `passed` until the generated code actually compiles.** Every file you write must be complete, valid code — never a stub, a single character, or a fragment. Before `step-end`, run the project's typecheck/build and require it to succeed:
 
-   **Step 5.5 — Branch on findings**
+| Stack               | Gate command                                                            |
+| ------------------- | ----------------------------------------------------------------------- |
+| TypeScript backend  | `npx tsc --noEmit` (or the project's `build`/`typecheck` script)        |
+| JS/Node             | `node --check <file>` on each generated file, or the project lint/build |
+| Expo / React Native | `npx tsc --noEmit` for the app code                                     |
 
-   _If `$EXISTING_SCHEMAS` is non-empty:_
-
-   Present a summary of what was found:
-
-   > "I found existing payment/order-related schemas:
-   >
-   > - `<file>`: `<table/model name>` — fields: `<list relevant fields>`
-   > - _(repeat for each)_
-   >
-   > Would you like me to:
-   >
-   > 1. **Extend these** — add Juspay-specific fields (`juspay_order_id`, `payment_status`, etc.) to the existing schema
-   > 2. **Create a separate table** — add a new `juspay_orders` table alongside the existing ones
-   > 3. **Skip DB changes** — I'll handle order correlation in the application layer only"
-
-   Wait for a selection. Apply only what the user confirms.
-
-   _If `$EXISTING_SCHEMAS` is empty:_
-
-   Ask permission before creating anything:
-
-   > "No existing payment or order schemas found. The docs require storing: `<fields derived from $PARAMS and the product's status/webhook docs>`.
-   >
-   > Shall I create a DB schema for this? If yes, which format?
-   >
-   > 1. Raw SQL migration
-   > 2. Prisma schema
-   > 3. TypeORM entity
-   > 4. Mongoose model
-   > 5. Skip — I'll handle this manually"
-
-   Wait for a selection. If the user picks 1–4, generate the schema using field names and constraints from the fetched docs. If they pick 5, skip entirely.
-
-   **Step 5.6 — Generate the agreed schema**
-
-   **Seed `db-schema` dynamic task** now (user confirmed DB changes are needed):
-
-   ```
-   TaskCreate({ name: "db-schema", description: "Create/migrate payment schema" })
-   integrate-results step-start db-schema
-   ```
-
-   Use field names, lengths, and constraints from `$CONSTRAINTS` (not `$PARAMS`) and the product's order/webhook docs. Apply `maxLength` values from `$CONSTRAINTS` as column size constraints (e.g., `VARCHAR(20)` for a field with `maxLength: 20`). Do not add fields that don't appear in the docs or that the user didn't request.
-
-   ```
-   integrate-results step-end passed "db schema generated: <table/model name>; N columns; constraints from $CONSTRAINTS applied"
-   ```
-
-   Flip `db-schema` task to `completed`.
-
-6. **Error handling** — use error codes from the docs to show how to handle different cases
+If it fails, read the errors, fix the generated code, and re-run until clean. Only then:
 
 ```
-integrate-results step-end passed "code generated: auth setup, core integration, webhook handler, status utility, DB schema; packages installed"
+integrate-results step-end passed "code generated and typechecks clean: <files>; packages installed; tsc --noEmit exit 0"
 ```
+
+If you genuinely cannot get a clean build (e.g. native toolchain unavailable in this environment), do **not** record `passed` — record `failed` with the actual error, or `skipped "<reason the build can't run here>"`. **Never record `passed` for code you did not verify compiles.**
 
 Flip `codegen` task to `completed`.
+
+### Step 5.3 — Database schema (the `db-schema-decision` step)
+
+**Only run this step if `db-schema-decision` is in the manifest.** The planner omits it when the app already has an order/payment schema (`hasExistingOrderSchema = true`) or the flow never touches a DB — in that case there is nothing to do here, and `step-start db-schema-decision` would be rejected as not-in-manifest. Skip straight to Phase 6.
+
+If it _is_ registered: `integrate-results step-start db-schema-decision`. Follow this flow strictly; do not write or suggest schema changes without completing every step. If, after scanning, you find the existing schema actually does cover everything, close it honestly — `step-end skipped "existing schema already stores order_id/status; no changes needed"`.
+
+#### Step 5.3.1 — Scan for existing schemas
+
+Search the codebase (delegate to `codebase-scanner` mode `existing-schemas`, or inline) for payment- or order-related DB definitions:
+
+- Migration files (`migrations/`, `db/migrate/`, `*.sql`, `*.prisma`, `schema.rb`, `typeorm/*.entity.*`, `mongoose` model files, etc.)
+- ORM model files that contain fields like `order_id`, `payment_status`, `transaction_id`, `amount`, or similar
+
+Collect every match as `$EXISTING_SCHEMAS`.
+
+#### Step 5.3.2 — Branch on findings
+
+_If `$EXISTING_SCHEMAS` is non-empty:_
+
+Present a summary of what was found:
+
+> "I found existing payment/order-related schemas:
+>
+> - `<file>`: `<table/model name>` — fields: `<list relevant fields>`
+> - _(repeat for each)_
+>
+> Would you like me to:
+>
+> 1. **Extend these** — add Juspay-specific fields (`juspay_order_id`, `payment_status`, etc.) to the existing schema
+> 2. **Create a separate table** — add a new `juspay_orders` table alongside the existing ones
+> 3. **Skip DB changes** — I'll handle order correlation in the application layer only"
+
+Wait for a selection. Apply only what the user confirms.
+
+_If `$EXISTING_SCHEMAS` is empty:_
+
+Ask permission before creating anything:
+
+> "No existing payment or order schemas found. The docs require storing: `<fields derived from $CONSTRAINTS and the product's status/webhook docs>`.
+>
+> Shall I create a DB schema for this? If yes, which format?
+>
+> 1. Raw SQL migration
+> 2. Prisma schema
+> 3. TypeORM entity
+> 4. Mongoose model
+> 5. Skip — I'll handle this manually"
+
+Wait for a selection. If the user picks 1–4, generate the schema using field names and constraints from the fetched docs. If they pick 5, skip entirely.
+
+#### Step 5.3.3 — Generate the agreed schema
+
+The `db-schema-decision` step is already in progress (started at Step 5.3). Use field names, lengths, and constraints from `$CONSTRAINTS` and the product's order/webhook docs. Apply `maxLength` values from `$CONSTRAINTS` as column size constraints (e.g., `VARCHAR(20)` for a field with `maxLength: 20`). Do not add fields that don't appear in the docs or that the user didn't request.
+
+```
+integrate-results step-end passed "db schema generated: <table/model name>; N columns; constraints from $CONSTRAINTS applied"
+```
+
+Flip `db-schema-decision` task to `completed`.
 
 ---
 
@@ -954,14 +1133,14 @@ Flip `codegen` task to `completed`.
 
 **Trigger**: `$PRODUCT_TYPE` is `sdk` or `hybrid` AND `$PLATFORM` is any of: `android`, `ios`, `react-native`, `flutter`, `cordova`, `capacitor`.
 
-The step name is the platform-specific dynamic name seeded in Wave 2: `{$PLATFORM}-setup` (e.g., `react-native-setup`, `android-setup`).
+The step name is the platform-specific name the planner registered: `{$PLATFORM}-setup` (e.g., `react-native-setup`, `android-setup`, `web-setup`).
 
-**If NOT triggered**, the handling depends on whether `{$PLATFORM}-setup` was seeded in Phase 2:
+**If NOT triggered**, the handling depends on whether the planner registered `{$PLATFORM}-setup` in the manifest:
 
-**Case A — Task was NOT seeded** (`$PRODUCT_TYPE = api-only`, or `$PRODUCT_TYPE = hybrid` with a non-mobile platform such as `web` or `iframe-web`):
+**Case A — step NOT in the manifest** (`$PRODUCT_TYPE = api-only`, or `$PRODUCT_TYPE = hybrid` with a non-mobile platform such as `web` or `iframe-web`):
 No lifecycle calls are needed — the step was never registered. Skip directly to Phase 7.
 
-**Case B — Task WAS seeded but native setup is not applicable** (`$PRODUCT_TYPE = sdk` on a non-mobile platform such as `web` or `iframe-web`, where the docs show no native SDK setup is needed):
+**Case B — step IS in the manifest but native setup is not applicable** (`$PRODUCT_TYPE = sdk` on a non-mobile platform such as `web` or `iframe-web`, where the docs show no native SDK setup is needed):
 
 ```
 integrate-results step-start {$PLATFORM}-setup
@@ -1141,6 +1320,8 @@ Run: `integrate-results step-start test` | flip `test` task to `in_progress`
 
 **Always attempt to run the server and test the integration yourself. Do not tell the user to test manually if you can do it.**
 
+> **`test passed` means tests actually ran.** Record `passed` only if real requests executed and you observed the HTTP status / body / DB effect (see GUARDRAIL 19). Calling a metrics endpoint or merely listing test cards is **not** a test. If nothing testable can run in this environment, record `step-end skipped "<why: e.g. mobile build requires a device>"` and provide the manual guide — never a fabricated pass.
+
 ### Step 8.1 — Start the dev server
 
 Scan the codebase for the start command:
@@ -1238,6 +1419,8 @@ Report in Step 8.4 table with type `Constraint`.
 
 **Step 8.3.1: Fetch test credentials** (all SDK/hybrid products)
 
+**Delegate to the `docs-fetcher` sub-agent, mode `test-resources`** (or inline) — it `doc_fetch_tool`s the test-resources page and returns `$TEST_CARDS`, `$TEST_UPI_VPA`, `$DUMMY_PG_FLOWS`. Inline form:
+
 ```
 juspay-docs-mcp:doc_fetch_tool({ url: "<test-resources md content link from $DOC_MAP>" })
 ```
@@ -1322,9 +1505,13 @@ integrate-results set active working
 integrate-results step-end passed "backend tests: session ✅ order-status ✅ webhook-success ✅ webhook-failure ✅; SDK: manual guide provided"
 ```
 
-### Step 8.5 — Confirm integration stages
+Flip `test` task to `completed`.
 
-Call `juspay_integration_monitoring_status` again with the same arguments as Step 5.1 to verify that test activity has been recorded against the merchant account:
+### Step 8.5 — Confirm integration stages (the `stages-confirm` step)
+
+This is the registered `stages-confirm` step — a sibling of `test`, not part of it. Begin it: `integrate-results step-start stages-confirm`.
+
+**Delegate to the `integration-stages-fetcher` sub-agent** (or inline) with the **same arguments as Step 5.1**, to re-read stage status and verify test activity was recorded against the merchant account:
 
 ```
 juspay-mcp:juspay_integration_monitoring_status({
@@ -1366,7 +1553,11 @@ If any critical stage (`criticalResult: true`) is still `NOT_ATTEMPTED` or `FAIL
 
 > "⚠️ Stage **[stageDisplayName]** is critical and still not passing. This must be resolved before go-live."
 
-Flip `test` task to `completed`.
+```
+integrate-results step-end passed "stage confirmation: $(passed)/$(total) critical passing; diff vs baseline reported"
+```
+
+Flip `stages-confirm` task to `completed`.
 
 ---
 
@@ -1505,8 +1696,10 @@ Juspay statuses mapped to app-internal statuses in the webhook handler and order
 [Non-obvious decisions, workarounds, known caveats, or anything a future developer would need to know. Do not include credential values. Examples: why a particular status mapping was chosen, a version constraint from the docs, a quirk of the SDK init flow, etc.]
 ```
 
+**Do not close `summary` until the file is written.** Use the Write tool to create it, then record the close naming the real path (GUARDRAIL 20):
+
 ```
-integrate-results step-end passed "summary written to [path]; N env vars, N routes, N DB changes, N status mappings documented"
+integrate-results step-end passed "summary written to [actual/path/product-date.md]; N env vars, N routes, N DB changes, N status mappings documented"
 ```
 
 Leave any section empty if no changes were made in that category (e.g., if this product's docs didn't require any environment variables, omit the Environment Variables section entirely rather than writing "None").
@@ -1525,7 +1718,26 @@ Flip `summary` task to `completed`.
 | `--from test`      | `test`           | Re-run live tests only                             |
 | `--from summary`   | `summary`        | Re-write the integration summary only              |
 
-When using `--from <step>`, seed the 8 STATIC_STEPS plus any dynamic steps that would have been generated before the entry point (e.g., `--from codegen` on a React Native project also seeds `react-native-setup` and `checklist`). Immediately mark all steps before the entry point as `completed` (back-to-back `step-start` / `step-end passed "resumed from --from flag"`).
+When using `--from <step>`, you must first **re-establish the manifest** (it is the completeness contract `finalize` checks), then re-derive in-memory state, then close the skipped-over steps:
+
+1. `integrate-results init` seeds the bootstrap manifest.
+2. Re-run the `plan` step (re-derive `$DOC_MAP`/`$PRODUCT`/`$PLATFORM` first, then `integration-planner` → `register`) so the full manifest exists exactly as it would on a normal run. Without this, `step-start` will reject the entry-point step as "not in the manifest."
+3. Mark every manifest step **before** the entry point as terminal — `step-start <name>` / `step-end passed "resumed from --from flag"` (or `skipped "<reason>"` for steps whose guard is false) — and flip their tasks to `completed`.
+
+### Resume state reconstruction (mandatory before running the entry-point step)
+
+Closing earlier steps only satisfies the completeness gate and the progress UI — it does **not** restore the in-memory variables those phases produced. On a fresh invocation, `$DOC_MAP`, `$CONSTRAINTS`, `$API_KEY`, endpoint routes, etc. are all empty. **Before executing the entry-point step, silently re-derive the state it depends on** by re-running the cheap, read-only resolution steps from earlier phases (delegate to the retrieval sub-agents where available; skip user prompts where a value can be detected or was passed via flags). Do not regenerate code or re-provision a key while reconstructing.
+
+Per entry point, reconstruct at minimum:
+
+| `--from`    | Re-derive before running                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doc-fetch` | `$PRODUCT` (flag or ask), `$PLATFORM` (Step 2.3 scan), `$DOC_MAP` + `$PRODUCT_TYPE` (`docs-fetcher` mode `doc-map` / Step 2.1) — then the manifest via the `plan` step                                                                                                                                                                                                                                                                                                                               |
+| `codegen`   | All of `doc-fetch` above **plus** re-fetch docs (`docs-fetcher` mode `constraints` / Phase 3) to rebuild `$CONSTRAINTS`, `$CODE_EXAMPLES`, `$ERROR_CODES`, `$VERSION_CONSTRAINTS`, `$WARNINGS`; re-resolve `$MERCHANT_ID`/`$CLIENT_ID` (Step 1.2), `$RETURN_URL`/`$WEBHOOK_URL` (Step 4.1), `$BACKEND_BASE_URL` + webhook-auth creds (Step 4.4); load `$API_KEY` per Step 4.2 (reuse existing — do **not** mint a new one); re-fetch `$INTEGRATION_STAGES` (`integration-stages-fetcher` / Step 5.1) |
+| `test`      | All of `codegen` above **plus** the generated endpoint routes (`$SESSION_ENDPOINT`, `$ORDER_STATUS_ENDPOINT`, `$WEBHOOK_ENDPOINT`) by scanning the already-generated code, and `$TEST_CARDS`/`$TEST_UPI_VPA` (`docs-fetcher` mode `test-resources` / Step 8.3.1) for SDK/hybrid                                                                                                                                                                                                                      |
+| `summary`   | `$PRODUCT`, `$PLATFORM`, `$MERCHANT_ID`, `$WEBHOOK_URL`, `$RETURN_URL`, and the actual set of files/routes/DB changes present in the working tree (read them from disk rather than from memory)                                                                                                                                                                                                                                                                                                      |
+
+If a value cannot be re-derived (e.g. no docs reachable, no generated code found for `--from test`), stop and tell the user which prerequisite is missing rather than proceeding with empty state.
 
 ---
 
@@ -1535,20 +1747,23 @@ Run: `integrate-results step-start done` | flip `done` task to `in_progress`
 
 ### Timing summary
 
-Run the timing summary script:
+Run the timing summary script (same path-resolution rule as `integrate-results` — resolve `scripts/lifecycle/done` relative to this skill's directory, not the project root):
 
 ```
-.claude/skills/integrate/scripts/lifecycle/done
+<skill-dir>/scripts/lifecycle/done
 ```
 
 It emits:
 
-1. A markdown timing table (step, status, duration, verification), with any step taking ≥30% of total time in **bold**.
-2. A total wall-clock line.
-3. A `**Slowest step**:` line.
-4. A `<<<FACTS ... FACTS` block with machine-readable data (`totalSeconds`, `slowestStep`, `dominantSteps`, `skippedSteps`, `failedSteps`, `product`, `platform`, `productType`).
+1. An **INCOMPLETE** warning line if any registered step (other than `done`) was never executed — this is the manifest completeness check surfacing.
+2. A markdown timing table (step, status, duration, verification), with any step taking ≥30% of total time in **bold**.
+3. A total wall-clock line.
+4. A `**Slowest step**:` line.
+5. A `<<<FACTS ... FACTS` block with machine-readable data (`totalSeconds`, `slowestStep`, `dominantSteps`, `skippedSteps`, `failedSteps`, `incompleteSteps`, `product`, `platform`, `productType`).
 
 Print the table to the user. Do not compute durations yourself.
+
+**If `incompleteSteps` is non-empty**, the run skipped registered work. Do **not** declare success: go back and execute (or explicitly `step-end skipped "<reason>"`) each listed step before completing. `set status completed` will refuse while any step is unaccounted for.
 
 ### Optimization suggestions
 
@@ -1557,57 +1772,64 @@ Read the `FACTS` block and generate 2–3 concrete suggestions based on the actu
 - If `doc-fetch` dominated: suggest `--from codegen` for re-runs when only regenerating code
 - If `test` failed: note which test failed and how to re-run with `--from test` after fixing
 - If `{platform}-setup` was slow: note the specific build step and suggest `--from codegen` for re-runs
-- If `params` was slow: user interaction was the bottleneck — suggest running with `--product <id> --platform <id>` next time to skip discovery
+- If `params-collect` was slow: user interaction was the bottleneck — suggest running with `--product <id> --platform <id>` next time to skip discovery
 - If `product-select` + `platform-detect` dominated: suggest `--product <id>` flag for faster re-runs
 
 Be specific to this run's data, not generic advice.
 
 ### Completion
 
+First confirm completeness, then close out:
+
 ```
-integrate-results set status completed    # or "failed" if any phase failed without recovery
+integrate-results finalize                # must print "complete: ..." — if it prints "incomplete: <names>", resolve those steps first
+integrate-results set status completed    # refused by the script while any step is unaccounted for; use "failed" if a phase failed without recovery
 integrate-results set active false
 integrate-results step-end passed "integration complete: $PRODUCT on $PLATFORM; timing table printed"
 ```
 
 Flip `done` task to `completed`.
 
-`"completed"` requires all steps `passed` or `skipped`. A `failed` step always blocks `"completed"` — call `integrate-results set status failed` instead.
+`set status completed` is structurally refused unless every registered step (except `done`) has a terminal record (`passed`/`skipped`). A `failed` step or an unaccounted step blocks completion — resolve it or call `integrate-results set status failed` instead.
 
 ---
 
 ## TOOL CALL REFERENCE
 
-| When          | Tool                                        | Purpose                                                                                       |
-| ------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Step 1.1      | Read `products/*.md`                        | Load product summaries for intent matching                                                    |
-| Step 1.2      | `juspay_get_merchant_details()`             | Auto-resolve merchant ID, client ID, integration type — infer recommended product             |
-| Step 1.7      | `explore_product(candidate-id)`             | Probe type and platforms before recommending                                                  |
-| Step 2.1      | `explore_product($PRODUCT)`                 | Get full doc structure and page URLs; classify product type                                   |
-| Phase 3       | `doc_fetch_tool(url)`                       | Fetch individual doc pages; build `$CONSTRAINTS` table with types, maxLength, minValue, etc.  |
-| Step 4.1      | `juspay_get_webhook_settings()`             | Check if webhook URL is already configured                                                    |
-| Step 4.1      | `juspay_get_general_settings()`             | Check if return URL is already configured                                                     |
-| Step 4.1      | `explore_product("dashboard")`              | Primary: get dashboard doc structure to find webhook/settings pages                           |
-| Step 4.1      | `doc_fetch_tool(url)`                       | Fetch the webhook or general-settings page from the dashboard product; store as `$DASHBOARD_DOCS` |
-| Step 4.1      | `list_products({ category: "DASHBOARD" })`  | Fallback if `explore_product("dashboard")` fails — find the correct dashboard product slug    |
-| Step 4.2      | `juspay_create_api_key(...)`                | Provision a new API key; store in memory only — never log or store in results file            |
-| Step 5.1      | `juspay_integration_monitoring_status(...)` | Fetch integration stage contract into `$INTEGRATION_STAGES`; drives which flows codegen must cover |
-| Step 8.5      | `juspay_integration_monitoring_status(...)` | Re-call after tests to confirm stage activity recorded; diff against `$INTEGRATION_STAGES` baseline |
-| Step 5.2      | (code output)                               | Emit validation layer from `$CONSTRAINTS` — length/value/type guards before API calls         |
-| Step 5.3      | Bash                                        | Install SDK packages (npm/flutter/gradle/pod) — names and versions from docs                  |
-| Phase 6       | Bash                                        | Run prebuild/generate/sync, run post-install scripts — steps derived from docs                |
-| Phase 6       | Edit / Write                                | Patch build config files or create platform config files — content derived from docs          |
-| Step 4.4      | Bash / Read                                 | Detect `$BACKEND_BASE_URL` from `.env` / `package.json`; read webhook auth credentials        |
-| Step 8.2      | Bash (product test scripts or inline curl)  | POST session endpoint; verify HTTP 200 + product-specific response fields + DB row            |
-| Step 8.2      | Bash (product test scripts or inline curl)  | GET order-status endpoint; verify HTTP 200 + status field                                     |
-| Step 8.2      | Bash (inline curl)                          | POST synthetic webhook events; payload from docs; assert HTTP 200 + DB updated                |
-| Phase 9       | Bash / Read                                 | Detect summary directory (`docs/`, `memory-bank/`, `notes/`, or project root)                 |
-| Phase 9       | Write                                       | Write `juspay-integration/[product]-[date].md` with env vars, routes, DB changes, mappings    |
-| Startup       | `integrate-results init`                    | Initialize lifecycle skeleton                                                                 |
-| Each phase    | `integrate-results step-start/step-end`     | Bookend every phase for timing accuracy                                                       |
-| Metadata      | `integrate-results set`                     | Store product/platform/productType/merchantId — never credentials                             |
-| Done          | `/scripts/lifecycle/done`                   | Generate timing table + FACTS block                                                           |
-| Fallback only | WebFetch                                    | Only if `doc_fetch_tool` returns an error on a valid URL                                      |
+| When          | Tool                                                                                                                         | Purpose                                                                                             |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Step 1.1      | Read `products/*.md`                                                                                                         | Load product summaries for intent matching                                                          |
+| Step 1.2      | `juspay_get_merchant_details()`                                                                                              | Auto-resolve merchant ID, client ID, integration type — infer recommended product                   |
+| Step 1.7      | `explore_product(candidate-id)`                                                                                              | Probe type and platforms before recommending                                                        |
+| Step 2.1      | `explore_product($PRODUCT)`                                                                                                  | Get full doc structure and page URLs; classify product type                                         |
+| Phase 3       | `doc_fetch_tool(url)`                                                                                                        | Fetch individual doc pages; build `$CONSTRAINTS` table with types, maxLength, minValue, etc.        |
+| Step 4.1      | `juspay_get_webhook_settings()`                                                                                              | Check if webhook URL is already configured                                                          |
+| Step 4.1      | `juspay_get_general_settings()`                                                                                              | Check if return URL is already configured                                                           |
+| Step 4.1      | `explore_product("dashboard")`                                                                                               | Primary: get dashboard doc structure to find webhook/settings pages                                 |
+| Step 4.1      | `doc_fetch_tool(url)`                                                                                                        | Fetch the webhook or general-settings page from the dashboard product; store as `$DASHBOARD_DOCS`   |
+| Step 4.1      | `list_products({ category: "DASHBOARD" })`                                                                                   | Fallback if `explore_product("dashboard")` fails — find the correct dashboard product slug          |
+| Step 4.2      | `juspay_create_api_key(...)`                                                                                                 | Provision a new API key; store in memory only — never log or store in results file                  |
+| Step 5.1      | `juspay_integration_monitoring_status(...)`                                                                                  | Fetch integration stage contract into `$INTEGRATION_STAGES`; drives which flows codegen must cover  |
+| Step 8.5      | `juspay_integration_monitoring_status(...)`                                                                                  | Re-call after tests to confirm stage activity recorded; diff against `$INTEGRATION_STAGES` baseline |
+| Step 5.2.1    | (code output)                                                                                                                | Emit validation layer from `$CONSTRAINTS` — length/value/type guards before API calls               |
+| Step 5.2.2    | Bash                                                                                                                         | Install SDK packages (npm/flutter/gradle/pod) — names and versions from docs                        |
+| Phase 6       | Bash                                                                                                                         | Run prebuild/generate/sync, run post-install scripts — steps derived from docs                      |
+| Phase 6       | Edit / Write                                                                                                                 | Patch build config files or create platform config files — content derived from docs                |
+| Step 4.4      | Bash / Read                                                                                                                  | Detect `$BACKEND_BASE_URL` from `.env` / `package.json`; read webhook auth credentials              |
+| Step 8.2      | Bash (product test scripts or inline curl)                                                                                   | POST session endpoint; verify HTTP 200 + product-specific response fields + DB row                  |
+| Step 8.2      | Bash (product test scripts or inline curl)                                                                                   | GET order-status endpoint; verify HTTP 200 + status field                                           |
+| Step 8.2      | Bash (inline curl)                                                                                                           | POST synthetic webhook events; payload from docs; assert HTTP 200 + DB updated                      |
+| Phase 9       | Bash / Read                                                                                                                  | Detect summary directory (`docs/`, `memory-bank/`, `notes/`, or project root)                       |
+| Phase 9       | Write                                                                                                                        | Write `juspay-integration/[product]-[date].md` with env vars, routes, DB changes, mappings          |
+| Startup       | `integrate-results init`                                                                                                     | Initialize lifecycle skeleton + bootstrap manifest                                                  |
+| `plan` step   | `integration-planner` sub-agent                                                                                              | Emit run-specific `steps.json` from `$DOC_MAP` + product file (closed vocabulary)                   |
+| `plan` step   | `integrate-results register steps.json`                                                                                      | Merge the planner's manifest in; rejects unknown names / malformed / missing required steps         |
+| Each step     | `integrate-results step-start/step-end`                                                                                      | Bookend every registered step; names must be in the manifest                                        |
+| Metadata      | `integrate-results set`                                                                                                      | Store product/platform/productType/merchantId — never credentials                                   |
+| Done          | `integrate-results finalize`                                                                                                 | Completeness gate — non-zero if a registered step was never executed                                |
+| Done          | `<skill-dir>/scripts/lifecycle/done`                                                                                         | Generate timing table + FACTS block (incl. `incompleteSteps`)                                       |
+| Retrieval     | `docs-fetcher` (modes: doc-map/constraints/dashboard-nav/test-resources) / `codebase-scanner` / `integration-stages-fetcher` | Read-only sub-agents; delegate when supported, else inline (see SUB-AGENTS & RUN MANIFEST)          |
+| Fallback only | WebFetch                                                                                                                     | Only if `doc_fetch_tool` returns an error on a valid URL                                            |
 
 **Never construct doc URLs yourself.** All URLs come from the `md content link` field in `explore_product` responses.
 
@@ -1657,3 +1879,19 @@ Each phase produces structured output in the conversation:
 12. **Error codes come from the docs.** Collect them from every page you fetch. Do not invent them.
 
 13. **Credentials never leave memory.** `$API_KEY`, `$WEBHOOK_AUTH_PASSWORD`, and any other secret must not appear in verification strings, task descriptions, `integrate-results` calls, Bash command arguments, or any terminal output. The `integrate-results` script enforces this for stored fields; the caller is responsible for verification strings and command arguments.
+
+14. **The manifest is the step contract — never skip a registered step silently.** Every step the planner registered must reach a terminal record (`passed`, or `skipped` with a reason) before `done`. `finalize` and `set status completed` hard-fail otherwise. If a step truly doesn't apply, close it `skipped "<reason>"`; never just move past it.
+
+15. **The planner emits only closed-vocabulary names.** `integration-planner` selects, guards, and orders steps from the fixed catalog in SUB-AGENTS & RUN MANIFEST — it never invents step names. `register` rejects anything else; if it rejects, fix the planner output, don't rename.
+
+16. **Validate every sub-agent's output before proceeding.** A retrieval sub-agent that returns empty/thin output is a caught error: `step-end failed` the owning step and surface the cause (e.g. the unreachable URL). Never paper over a missing `$DOC_MAP`, `$CONSTRAINTS`, or stage list with invented values.
+
+17. **Retrieval sub-agents never interact with the user.** They are read-only and return data; all questions, confirmations, and dashboard-config hand-offs stay in the orchestrator.
+
+18. **Verification strings describe what actually happened — never fabricate.** Recording `step-end passed` is a claim that the step's work was _really done and observed_. Do not write "fetched N pages; 50+ fields in constraints" unless you actually extracted those fields; do not record `test passed` unless real requests ran and you saw the responses; do not record `summary passed` unless the summary file was written. The completeness gate proves a step was _recorded_, not that it was _done_ — that integrity is on you. If the work could not be done, record `failed` (with the real error) or `skipped "<honest reason>"`, never a fake `passed`.
+
+19. **`test passed` requires real evidence.** A test step is `passed` only when actual requests ran and you observed the HTTP status / response body / DB row. Calling an unrelated metrics endpoint, or "documenting test cards," is not testing. If the app cannot be run here (mobile build, no server), record `skipped "<why>"` and hand over the manual test guide — do not claim a pass.
+
+20. **`summary passed` requires the file on disk.** Phase 9 writes a summary markdown file. Do not close `summary` until the file exists; name its path in the verification string.
+
+21. **Settings responses carry secrets — never persist or echo them.** `juspay_get_general_settings` / `juspay_get_webhook_settings` return `cardEncodingKey`, `internalHashKey`, `paymentResponseHashKey`, `webHookPassword`, SSL certs, and more. Use only the specific non-secret values you need (`returnUrl`, `webHookurl`, subscribed events). **Never copy any of these secret fields into `.env`, generated code, verification strings, or chat.** Read webhook-auth credentials from the project's own `.env` (Step 4.4), not from the settings API response.
