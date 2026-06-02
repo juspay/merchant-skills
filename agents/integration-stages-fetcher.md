@@ -1,6 +1,6 @@
 ---
 name: integration-stages-fetcher
-description: Internal retrieval sub-agent for the /integrate skill. Invoked explicitly to fetch and filter the integration monitoring stages. Do NOT auto-delegate or use for general requests.
+description: Internal retrieval sub-agent for the /jp-executor skill. Invoked explicitly to fetch and filter the integration monitoring stages. Do NOT auto-delegate or use for general requests.
 tools: mcp__juspay-mcp__juspay_integration_monitoring_status
 ---
 

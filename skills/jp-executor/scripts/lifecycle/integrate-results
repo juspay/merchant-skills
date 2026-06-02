@@ -51,7 +51,7 @@ FILE=".integrate-results.json"
 # The planner may only emit names from this set. register/step-* reject others.
 _is_allowed_step() {
   case "$1" in
-    product-select|platform-detect|plan|doc-fetch|codegen|checklist|test|summary|done|\
+    product-select|platform-detect|plan|doc-fetch|arch-decisions|codegen|checklist|test|summary|done|\
     android-setup|ios-setup|react-native-setup|flutter-setup|cordova-setup|capacitor-setup|web-setup|iframe-web-setup|\
     platform-disambiguation|params-collect|apikey-provision|webhook-config|return-url-config|db-schema-decision|integration-stages|stages-confirm)
       return 0 ;;
@@ -77,8 +77,8 @@ FILE = ".integrate-results.json"
 SENSITIVE = re.compile(r'key|secret|password|token', re.IGNORECASE)
 
 ALLOWED_STEPS = {
-    "product-select", "platform-detect", "plan", "doc-fetch", "codegen",
-    "checklist", "test", "summary", "done",
+    "product-select", "platform-detect", "plan", "doc-fetch", "arch-decisions",
+    "codegen", "checklist", "test", "summary", "done",
     "android-setup", "ios-setup", "react-native-setup", "flutter-setup",
     "cordova-setup", "capacitor-setup", "web-setup", "iframe-web-setup",
     "platform-disambiguation", "params-collect", "apikey-provision",

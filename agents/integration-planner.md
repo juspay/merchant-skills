@@ -1,6 +1,6 @@
 ---
 name: integration-planner
-description: Internal sub-agent for the /integrate skill. Invoked explicitly by the orchestrator at the `plan` step to compute the run manifest. Do NOT auto-delegate or use for general requests.
+description: Internal sub-agent for the /jp-executor skill. Invoked explicitly by the orchestrator at the `plan` step to compute the run manifest. Do NOT auto-delegate or use for general requests.
 tools: Read, Grep, Glob, Write
 ---
 

@@ -1,6 +1,6 @@
 # Juspay for Claude Code
 
-One command to give Claude Code (and any MCP-aware agent) full Juspay context: signed-in merchant data, live documentation, and a guided `/integrate` wizard for adding Juspay payments to any project.
+One command to give Claude Code (and any MCP-aware agent) full Juspay context: signed-in merchant data, live documentation, and a guided `/jp-executor` wizard for adding Juspay payments to any project.
 
 ## Install
 
@@ -21,7 +21,7 @@ That's it. First run opens a browser for sign-in, registers two MCP servers, ins
 | **OAuth tokens** | `~/.config/juspay/oauth.json` (mode 0600) | 90-day session, reused across runs |
 | **Dashboard MCP** | user-scope in Claude Code config | Live merchant data: orders, gateways, settings, API keys |
 | **Docs MCP** | user-scope in Claude Code config | Live Juspay documentation lookup |
-| **Integrate skill** | `~/.claude/skills/integrate/` | The `/integrate` wizard + per-product reference files |
+| **jp-executor skill** | `~/.claude/skills/jp-executor/` | The `/jp-executor` wizard + per-product reference files |
 
 ## Commands
 
@@ -35,12 +35,12 @@ juspay-claude uninstall    Remove MCPs, skills, config, OAuth tokens
 juspay-claude help         Show all commands
 ```
 
-## How `/integrate` works
+## How `/jp-executor` works
 
-Open Claude in a project, run `/integrate` (or just describe what you want):
+Open Claude in a project, run `/jp-executor` (or just describe what you want):
 
 ```
-/integrate
+/jp-executor
 Help me integrate Juspay payments into this app
 Set up Hyper Checkout for my React Native app
 I need to add payouts to my backend
@@ -62,7 +62,7 @@ The skill runs a 7-phase, doc-driven workflow:
 ### Flags
 
 ```
-/integrate --product hyper-checkout --platform flutter
+/jp-executor --product hyper-checkout --platform flutter
 ```
 
 | Flag | Effect |
@@ -75,7 +75,7 @@ The skill runs a 7-phase, doc-driven workflow:
 ```
 skills/
 └── integrate/
-    ├── SKILL.md        # The /integrate decision engine — contains no product
+    ├── SKILL.md        # The /jp-executor decision engine — contains no product
     │                   # knowledge, only the workflow and decision rules.
     └── products/       # One file per product: id, category, platforms,
         ├── hyper-checkout.md      # intent signals. Read on demand by the
@@ -94,13 +94,13 @@ skills/
 
 ## Test it
 
-A demo merchant app lives in [`test_app/`](./test_app/). Clone, install the CLI, run `juspay-claude` in any project, and try `/integrate`.
+A demo merchant app lives in [`test_app/`](./test_app/). Clone, install the CLI, run `juspay-claude` in any project, and try `/jp-executor`.
 
 You don't need this repo to use the CLI — the install command above is sufficient. Clone only if you want to inspect the skills source or contribute new product entries.
 
 ## Adding a new product
 
-Product entries live in `skills/integrate/products/`. Each file is markdown with a frontmatter block:
+Product entries live in `skills/jp-executor/products/`. Each file is markdown with a frontmatter block:
 
 ```yaml
 ---

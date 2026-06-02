@@ -37,7 +37,7 @@ checkout UI, payment page, payment screen, pre-built UI, hosted payment, accept 
 ### Step 7B-1 — Session creation
 
 ```bash
-bash .claude/skills/integrate/scripts/test/hyper-checkout/session.sh \
+bash .claude/skills/jp-executor/scripts/test/hyper-checkout/session.sh \
   "$SESSION_ENDPOINT" "$TEST_ORDER_ID" "$TEST_AMOUNT" \
   "$TEST_CUSTOMER_ID" "$TEST_CUSTOMER_EMAIL" "$TEST_CUSTOMER_PHONE" \
   "$TEST_FIRST_NAME" "$TEST_LAST_NAME"
@@ -50,7 +50,7 @@ Extract `juspay_order_id` from the response as `TEST_JUSPAY_ORDER_ID` for the we
 ### Step 7B-2 — Order status
 
 ```bash
-bash .claude/skills/integrate/scripts/test/hyper-checkout/order-status.sh \
+bash .claude/skills/jp-executor/scripts/test/hyper-checkout/order-status.sh \
   "$ORDER_STATUS_ENDPOINT" "$TEST_ORDER_ID"
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: codebase-scanner
-description: Internal retrieval sub-agent for the /integrate skill. Invoked explicitly to scan the working tree for one signal (language, platform, schemas, ports, handlers). Do NOT auto-delegate or use for general requests.
+description: Internal retrieval sub-agent for the /jp-executor skill. Invoked explicitly to scan the working tree for one signal (language, platform, schemas, ports, handlers). Do NOT auto-delegate or use for general requests.
 tools: Read, Grep, Glob
 ---
 

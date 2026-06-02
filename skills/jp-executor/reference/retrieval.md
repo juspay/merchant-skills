@@ -6,18 +6,6 @@ Load the section you need when a phase calls for it. Each procedure is **read-on
 
 ---
 
-## §doc-map  (Step 2.1)
-
-Input: a product id. Call `juspay-docs-mcp:explore_product({ product })`; if it fails, `list_products` to resolve the slug, then retry. Build `$DOC_MAP`:
-
-- `title`, `platforms[] {id,title}`, `sections[] {platform, sectionTitle, pages[]{pageTitle, mdContentLink, order}}` (preserve numbered-page order via `order`).
-- `productType`: runtime platform IDs → `sdk`; only `docs` → `api-only`; mix → `hybrid`.
-- `hasWebhooks`, `hasStatusApi`, `hasTestResources`: whether such a section/page exists.
-
-Validate `$DOC_MAP` is non-empty before proceeding.
-
----
-
 ## §constraints  (Phase 3 — doc-fetch)
 
 Input: the ordered `md content link` URLs (Pre-Requisites/Overview first, then numbered base pages, then webhooks/status, then error codes). `doc_fetch_tool({ url })` each in order (fall back to WebFetch only on a valid-URL error). Read each fully and build:
@@ -51,7 +39,7 @@ Input: the test-resources `md content link`. `doc_fetch_tool` it (fall back to W
 
 ---
 
-## §codebase-signals  (Steps 2.2, 2.2.5, 2.3, 4.1, 4.4, plan, 5.3.1)
+## §codebase-signals  (Steps 4.1, 4.4, 5.3.1)
 
 Read-only fan-out scans with Glob/Grep/Read. Return a verdict + the signal files matched; never guess — `null` when nothing is found.
 

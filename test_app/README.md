@@ -1,10 +1,10 @@
 # Test merchant app
 
-A minimal React + Vite e-commerce app you can use to try the `/integrate` flow end-to-end.
+A minimal React + Vite e-commerce app you can use to try the `/jp-executor` flow end-to-end.
 
 ## What's in it
 
-[`test-ecomm2/`](./test-ecomm2/) — "Shoply," a small storefront with products, a cart, and a checkout page that's deliberately left empty. That empty checkout is where `/integrate` wires Juspay in.
+[`test-ecomm2/`](./test-ecomm2/) — "Shoply," a small storefront with products, a cart, and a checkout page that's deliberately left empty. That empty checkout is where `/jp-executor` wires Juspay in.
 
 ```
 test-ecomm2/
@@ -17,7 +17,7 @@ test-ecomm2/
     ├── products.js
     ├── components/    Header, Footer, ProductCard
     ├── context/       CartContext
-    └── pages/         Home, Cart, Checkout  ← /integrate edits this
+    └── pages/         Home, Cart, Checkout  ← /jp-executor edits this
 ```
 
 ## Try it
@@ -41,7 +41,7 @@ juspay-claude        # in another terminal, from the test-ecomm2 dir
 Inside Claude:
 
 ```
-/integrate
+/jp-executor
 ```
 
 The wizard will sign you in, read your merchant account, recommend a product, fetch the relevant docs, and generate the actual integration code into `src/pages/Checkout.jsx` (plus any backend it needs you to add).
@@ -61,7 +61,7 @@ cd test_app/test-ecomm2 && npm install
 
 ## Reset between runs
 
-`/integrate` modifies the source. To start fresh:
+`/jp-executor` modifies the source. To start fresh:
 
 ```bash
 cd test_app/test-ecomm2
