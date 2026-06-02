@@ -87,15 +87,18 @@ createdAt: "{{today's date}}"
 product: ""
 productType: ""
 platform: ""
+clientPlatforms: ""
+entityName: ""
 merchantId: ""
 clientId: ""
 backendLang: "{{$DETECTED_LANG or unknown}}"
 backendBaseUrl: "{{$BACKEND_BASE_URL or unknown}}"
 hasPersistenceSchema: {{$HAS_PERSISTENCE_SCHEMA}}
+hasWebhooks: false
 webhookUrl: ""
+webhookEventsSelected: ""
 returnUrl: ""
 apiKeySource: ""
-hasWebhooks: false
 ---
 
 # Juspay Integration Plan

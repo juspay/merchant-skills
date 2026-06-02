@@ -3,7 +3,7 @@
 ## Rules
 
 - Use **native select UI** for all choices — no free-text product entry.
-- All product knowledge comes from `{skill-root}/../../products/` — never from memory or training data.
+- All product knowledge comes from `{skill-root}/products/` — never from memory or training data.
 - Call `explore_product` only after product is confirmed.
 - Write confirmed values to plan before proceeding.
 
@@ -31,7 +31,7 @@ Extract and store:
 
 ### 2. Load Product Catalog
 
-Read all files from `{skill-root}/../../products/`. Each file defines: product ID, name, type, platforms, use cases, intent signals.
+Read all files from `{skill-root}/products/`. Each file defines: product ID, name, type, platforms, use cases, intent signals.
 
 Store as `$PRODUCT_CATALOG`.
 

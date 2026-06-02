@@ -18,7 +18,7 @@ Assemble the complete `juspay-plan.md`, compute the executor step manifest, pres
 Using all collected context (`$PRODUCT`, `$PRODUCT_TYPE`, `$PLATFORM`, `$HAS_WEBHOOKS`, `$HAS_PERSISTENCE_SCHEMA`), compute the step list:
 
 **Always include:**
-`doc-fetch`, `arch-decisions`, `apikey-provision`, `return-url-config`, `params-collect`, `integration-stages`, `codegen`, `checklist`, `test`, `stages-confirm`, `summary`, `done`
+`doc-fetch`, `arch-decisions`, `apikey-provision`, `return-url-config`, `params-collect`, `integration-preview`, `integration-stages`, `codegen`, `checklist`, `test`, `stages-confirm`, `summary`, `done`
 
 **Conditionally include:**
 - `webhook-config` — only if `$HAS_WEBHOOKS = true`
@@ -27,7 +27,7 @@ Using all collected context (`$PRODUCT`, `$PRODUCT_TYPE`, `$PLATFORM`, `$HAS_WEB
 - `{$PLATFORM}-setup` — include the matching platform setup step (e.g. `react-native-setup`); omit for `api-only`
 
 **Ordering:**
-`doc-fetch` → `arch-decisions` → (`webhook-config`) → `return-url-config` → `apikey-provision` → `params-collect` → (`platform-disambiguation`) → `integration-stages` → `codegen` → (`db-schema-decision`) → (`{$PLATFORM}-setup`) → `checklist` → `test` → `stages-confirm` → `summary` → `done`
+`doc-fetch` → `arch-decisions` → (`webhook-config`) → `return-url-config` → `apikey-provision` → `params-collect` → (`platform-disambiguation`) → `integration-preview` → `integration-stages` → `codegen` → (`db-schema-decision`) → (`{$PLATFORM}-setup`) → `checklist` → `test` → `stages-confirm` → `summary` → `done`
 
 Store as `$MANIFEST_STEPS[]`.
 
@@ -46,6 +46,7 @@ createdAt: "{{date}}"
 product: "{{$PRODUCT}}"
 productType: "{{$PRODUCT_TYPE}}"
 platform: "{{$PLATFORM}}"
+clientPlatforms: "{{$CLIENT_PLATFORMS as comma-separated string, or empty for SDK products}}"
 entityName: "{{$ENTITY_NAME}}"
 merchantId: "{{$MERCHANT_ID}}"
 clientId: "{{$CLIENT_ID}}"
@@ -53,7 +54,9 @@ backendLang: "{{$DETECTED_LANG}}"
 backendBaseUrl: "{{$BACKEND_BASE_URL}}"
 apiKeySource: "{{$API_KEY_SOURCE}}"
 hasPersistenceSchema: {{$HAS_PERSISTENCE_SCHEMA}}
+hasWebhooks: {{$HAS_WEBHOOKS}}
 webhookUrl: "{{$WEBHOOK_URL or $PLANNED_WEBHOOK_URL or empty string}}"
+webhookEventsSelected: "{{$WEBHOOK_EVENTS_SELECTED as comma-separated string, or empty string}}"
 returnUrl: "{{$RETURN_URL or $PLANNED_RETURN_URL or empty string}}"
 ---
 
@@ -68,7 +71,9 @@ _Written by jp-planner. Read by /jp-executor via `--from-plan`._
 | Product | {{$PRODUCT}} |
 | Product Type | {{$PRODUCT_TYPE}} |
 | Platform | {{$PLATFORM}} |
+| Client Platforms | {{$CLIENT_PLATFORMS or "N/A (SDK product)"}} |
 | Merchant ID | {{$MERCHANT_ID}} |
+| Webhooks | {{$HAS_WEBHOOKS ? "Yes — " + $WEBHOOK_EVENTS_SELECTED : "No — order status API only"}} |
 
 ## Doc Pages (executor fetches in this order)
 {{for each page in $DOC_PAGES}}
@@ -77,6 +82,18 @@ _Written by jp-planner. Read by /jp-executor via `--from-plan`._
 
 ## Dashboard Config Hints
 {{paste the complete ## Dashboard Config Hints block written in step-05}}
+
+## Architecture
+{{paste the ## Architecture section written in step-06}}
+
+## Interface Surface
+{{paste the ## Interface Surface section written in step-06}}
+
+## Merchant System Touches
+{{paste the ## Merchant System Touches section written in step-06}}
+
+## Payment Flow
+{{paste the ## Payment Flow narrative written in step-06}}
 
 ## Executor Manifest
 ```json
@@ -90,9 +107,10 @@ Each step object must include a `description` field. The `terminal` field is an 
 {"name": "webhook-config", "description": "Use $DASHBOARD_HINTS.webhook nav/link to guide user to configure webhook in Juspay dashboard", "guard": "hasWebhooks", "terminal": ["passed","skipped"], "critical": false},
 {"name": "return-url-config", "description": "Use $DASHBOARD_HINTS.return-url nav/link to guide user to configure return URL", "guard": "always", "terminal": ["passed","skipped"], "critical": false},
 {"name": "apikey-provision", "description": "Check .env for JUSPAY_API_KEY; if absent, call juspay_create_api_key and store in memory", "guard": "always", "terminal": ["passed"], "critical": true},
-{"name": "params-collect", "description": "Build elicitation list from $CONSTRAINTS; collect required fields not auto-sourced via question gate", "guard": "always", "terminal": ["passed"], "critical": true},
+{"name": "params-collect", "description": "Build elicitation list from $CONSTRAINTS; collect required fields not auto-sourced via question gate; write each confirmed env var to .env immediately", "guard": "always", "terminal": ["passed"], "critical": true},
+{"name": "integration-preview", "description": "Show complete file list, endpoint list, and merchant-system touch summary derived from $ARCH_DECISIONS; require developer approval before codegen", "guard": "always", "terminal": ["passed"], "critical": true},
 {"name": "integration-stages", "description": "Call juspay_integration_monitoring_status; build $INTEGRATION_STAGES and $SCORE_BASELINE", "guard": "always", "terminal": ["passed","skipped"], "critical": false},
-{"name": "codegen", "description": "Apply $ARCH_DECISIONS; generate config module, session endpoint, webhook handler, order-status utility, SDK init; typecheck before close", "guard": "always", "terminal": ["passed"], "critical": true},
+{"name": "codegen", "description": "Apply $ARCH_DECISIONS; generate interface files in lib/juspay/ or equivalent; wire routes minimally; typecheck before close", "guard": "always", "terminal": ["passed"], "critical": true},
 {"name": "db-schema-decision", "description": "Scan for existing schemas; generate or extend $entityName table using $CONSTRAINTS field sizes", "guard": "noPersistenceSchema", "terminal": ["passed","skipped"], "critical": false},
 {"name": "react-native-setup", "description": "Install SDK packages from prerequisites page; patch build configs; run post-install scripts", "guard": "platform=react-native", "terminal": ["passed","skipped"], "critical": false},
 {"name": "checklist", "description": "Emit integration checklist from fetched docs; parameter constraints table; error codes table; integration stages checklist", "guard": "always", "terminal": ["passed"], "critical": false},
