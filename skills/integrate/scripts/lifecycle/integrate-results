@@ -59,7 +59,7 @@ _is_allowed_step() {
   esac
 }
 
-cmd="${1:?Usage: integrate-results <init|register|step-start|step-end|step|set|finalize> ...}"
+cmd="${1:?Usage: integrate-results <init|register|step-start|step-end|step|set|expect|fulfilled|finalize> ...}"
 shift
 
 # ── JSON processor detection: jq → python3 → python → exit 2 ──────────────
@@ -152,9 +152,17 @@ def require_in_manifest(data, name):
             "(or the planner omitted it)".format(name))
 
 
+def unmet_inputs(data, name):
+    # Question gate: fields declared via `expect <name> ...` that have no
+    # matching `fulfilled <name> <field>` yet. Returns the missing list.
+    expected = (data.get("expected") or {}).get(name, [])
+    got = set((data.get("fulfilled") or {}).get(name, []))
+    return [f for f in expected if f not in got]
+
+
 argv = sys.argv[1:]
 if not argv:
-    die("Usage: integrate-results <init|register|step-start|step-end|step|set|finalize> ...")
+    die("Usage: integrate-results <init|register|step-start|step-end|step|set|expect|fulfilled|finalize> ...")
 
 cmd, rest = argv[0], argv[1:]
 
@@ -245,6 +253,12 @@ elif cmd == "step-end":
     started = pending.get("startedAt", "")
     if not name:
         die("no pendingStep — call step-start first")
+    if status == "passed":
+        unmet = unmet_inputs(data, name)
+        if unmet:
+            die("cannot close '{}' as passed — unmet required inputs: {} "
+                "(collect them and call `fulfilled {} <field>`, or close as skipped)".format(
+                    name, ",".join(unmet), name))
     step = {"name": name, "status": status, "verification": verif,
             "startedAt": started, "completedAt": completed}
     if reason:
@@ -269,6 +283,10 @@ elif cmd == "step":
     if completed == "now": completed = _now
     data = read_file()
     require_in_manifest(data, name)
+    if status == "passed":
+        unmet = unmet_inputs(data, name)
+        if unmet:
+            die("cannot close '{}' as passed — unmet required inputs: {}".format(name, ",".join(unmet)))
     step = {"name": name, "status": status, "verification": verif,
             "startedAt": started, "completedAt": completed}
     if reason:
@@ -277,6 +295,28 @@ elif cmd == "step":
     write_file(data)
     count = len(data["steps"])
     sys.stdout.write("recorded: {} {} (steps={})\n".format(name, status, count))
+
+elif cmd == "expect":
+    if len(rest) < 2:
+        die("expect: step name and a comma-separated field list required")
+    step_name, fields = rest[0], rest[1]
+    items = [f.strip() for f in fields.split(",") if f.strip()]
+    data = read_file()
+    data.setdefault("expected", {})[step_name] = items
+    write_file(data)
+    sys.stdout.write("expected: {} needs {}\n".format(step_name, ",".join(items)))
+
+elif cmd == "fulfilled":
+    if len(rest) < 2:
+        die("fulfilled: step name and field required")
+    step_name, field = rest[0], rest[1]
+    data = read_file()
+    bag = data.setdefault("fulfilled", {}).setdefault(step_name, [])
+    if field not in bag:
+        bag.append(field)
+    write_file(data)
+    total = len((data.get("expected") or {}).get(step_name, []))
+    sys.stdout.write("fulfilled: {} {} ({}/{})\n".format(step_name, field, len(bag), total))
 
 elif cmd == "set":
     if len(rest) < 2:
@@ -308,7 +348,7 @@ elif cmd == "finalize":
 
 else:
     sys.stderr.write("Unknown command: {}\n".format(cmd))
-    sys.stderr.write("Usage: integrate-results <init|register|step-start|step-end|step|set|finalize> ...\n")
+    sys.stderr.write("Usage: integrate-results <init|register|step-start|step-end|step|set|expect|fulfilled|finalize> ...\n")
     sys.exit(1)
 PYEOF
 
@@ -346,6 +386,12 @@ _require_in_manifest() {
 
 _missing_steps() {
   $JQ -r '(([.manifest[]?.name] - [.steps[]?.name] - ["done"]) // []) | join(",")' "$FILE"
+}
+
+# Question gate: expected fields for a step that have no matching `fulfilled` yet.
+_unmet_inputs() {
+  local n="$1"
+  $JQ -r --arg n "$n" '(((.expected // {})[$n] // []) - ((.fulfilled // {})[$n] // [])) | join(",")' "$FILE"
 }
 
 case "$cmd" in
@@ -442,6 +488,14 @@ ENDJSON
       exit 1
     fi
 
+    if [ "$status" = "passed" ]; then
+      unmet="$(_unmet_inputs "$name")"
+      if [ -n "$unmet" ]; then
+        echo "integrate-results: cannot close '$name' as passed — unmet required inputs: $unmet (collect them and call \`fulfilled $name <field>\`, or close as skipped)" >&2
+        exit 1
+      fi
+    fi
+
     if [ -n "$reason" ]; then
       $JQ --arg n "$name" --arg s "$status" --arg v "$verif" \
          --arg sa "$startedAt" --arg ca "$completedAt" --arg r "$reason" \
@@ -474,6 +528,13 @@ ENDJSON
       exit 1
     fi
     _require_in_manifest "$name"
+    if [ "$status" = "passed" ]; then
+      unmet="$(_unmet_inputs "$name")"
+      if [ -n "$unmet" ]; then
+        echo "integrate-results: cannot close '$name' as passed — unmet required inputs: $unmet" >&2
+        exit 1
+      fi
+    fi
 
     [[ "$startedAt" == "now" ]] && startedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     [[ "$completedAt" == "now" ]] && completedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -526,9 +587,30 @@ ENDJSON
     echo "complete: all manifest steps recorded"
     ;;
 
+  expect)
+    step_name="${1:?step name required}"
+    fields="${2:?comma-separated field list required}"
+    items="$(printf '%s' "$fields" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' || true)"
+    json="$(printf '%s\n' "$items" | $JQ -R . | $JQ -s .)"
+    $JQ --arg n "$step_name" --argjson v "$json" '.expected = ((.expected // {}) | .[$n] = $v)' \
+      "$FILE" > "${FILE}.tmp" && mv "${FILE}.tmp" "$FILE"
+    echo "expected: $step_name needs $(printf '%s' "$items" | tr '\n' ',' | sed 's/,$//')"
+    ;;
+
+  fulfilled)
+    step_name="${1:?step name required}"
+    field="${2:?field required}"
+    $JQ --arg n "$step_name" --arg f "$field" \
+      '.fulfilled = ((.fulfilled // {}) | .[$n] = (((.[$n] // []) + [$f]) | unique))' \
+      "$FILE" > "${FILE}.tmp" && mv "${FILE}.tmp" "$FILE"
+    got="$($JQ -r --arg n "$step_name" '((.fulfilled // {})[$n] // []) | length' "$FILE")"
+    total="$($JQ -r --arg n "$step_name" '((.expected // {})[$n] // []) | length' "$FILE")"
+    echo "fulfilled: $step_name $field ($got/$total)"
+    ;;
+
   *)
     echo "Unknown command: $cmd" >&2
-    echo "Usage: integrate-results <init|register|step-start|step-end|step|set|finalize> ..." >&2
+    echo "Usage: integrate-results <init|register|step-start|step-end|step|set|expect|fulfilled|finalize> ..." >&2
     exit 1
     ;;
 esac
