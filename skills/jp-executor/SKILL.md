@@ -39,8 +39,10 @@ Read fully and follow: `./steps/step-01-init.md`. The step chain:
 5. `step-05-data-model.md` — order/payment schema. *(only if a `db` task exists)*
 6. `step-06-native-setup.md` — mobile native SDK setup. *(only on native surfaces)*
 7. `step-07-portal-config.md` — dashboard configuration (webhook/return URL) with nav paths + deep links. *(only if `manual-dashboard` tasks exist)*
-8. `step-08-test.md` — inline tests / SDK manual guide / stage confirmation. *(runs the `test` tasks that exist)*
+8. `step-08-test.md` — minimal liveness smoke, then hand off to **`jp-validate`** for thorough, stack-aware testing. *(only if `test` tasks exist)*
 9. `step-09-summary.md` — persistent integration summary; finalize checklist statuses. *(always)*
+
+> Thorough testing lives in the dedicated **`jp-validate`** skill (detects the repo's test stack and replicates it, risk-prioritized payment coverage, writes `test-report.md`). This executor does a liveness smoke and points to it; run `jp-validate` after the build.
 
 **Steps are conditional.** Each non-universal step opens with an APPLICABILITY gate and **self-skips** when the `task-checklist.md` (authoritative) and `architecture.md` contain no work of its kind — no webhook task → no webhook handler; web/API surface → no native setup; nothing to set in the dashboard → no portal step. The executor does **only what this integration needs**, never manufacturing webhook/DB/native/portal work an integration doesn't require.
 

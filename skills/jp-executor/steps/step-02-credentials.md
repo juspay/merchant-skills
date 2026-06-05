@@ -35,8 +35,9 @@ If the webhook handler uses Basic Auth or a signing secret, decide the env-var n
 ### 5. Environment alignment preflight
 
 Before leaving this step, confirm the configured host/environment and key target agree: sandbox key ↔
-sandbox host, production key ↔ production host. If the architecture or dashboard docs distinguish key
-types/stages, record that in env/config now. Do **not** defer this check to live testing.
+sandbox host, production key ↔ production host. **Default to production** when the architecture/PRD/user
+named no environment explicitly. If the architecture or dashboard docs distinguish key types/stages, record
+that in env/config now. Do **not** defer this check to live testing.
 
 ## VERIFY & RECORD
 

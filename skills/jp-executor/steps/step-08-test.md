@@ -1,39 +1,35 @@
-# Step 8: Live Testing *(conditional)*
+# Step 8: Smoke Test & Handoff to `jp-validate` *(conditional)*
 
 ## APPLICABILITY
 
-Run **only if** `task-checklist.md` has `test` tasks (cross-check the architecture). Only run the kinds of
-tests the integration supports (e.g. no backend tests for a client-only integration; SDK UI gets a manual
-guide, not CLI automation). **If there are no test tasks, record nothing and load the next step.**
+Run **only if** `task-checklist.md` has `test` tasks (cross-check the architecture). **If there are no test tasks, record nothing and load the next step.**
 
 ## MANDATORY RULES (READ FIRST)
 
 - 📖 Read this complete step file before acting.
-- 🧪 Test **inline** (curl / bash / the project's own runner) — no bundled scripts.
+- 🤝 Thorough testing is owned by **`jp-validate`** — recommend it; only run the inline smoke here if the user declines or it isn't available.
 - 🔐 Pass credentials to tests via exported env vars, never inline; never echo them.
-- 🚫 Never silently mark a test passed — if something can't be automated (CAPTCHA, device-only SDK), say so.
-- 🤝 Confirm before starting the dev server. ⚠️ NO TIME ESTIMATES.
+- 🚫 Never silently mark a test passed. 🤝 Confirm before starting the dev server. ⚠️ NO TIME ESTIMATES.
 
-## SEQUENCE (run the parts that apply)
+## YOUR TASK
 
-1. **Environment preflight** — before starting anything live, confirm the configured key/stage and host/base
-   URL agree (sandbox key ↔ sandbox host, production key ↔ production host). If they don't, stop and mark
-   the affected test tasks `blocked` until corrected.
-2. **Dev server** — detect the start command; confirm; run in background until ready. (Skip for mobile-only.)
-3. **Backend tests** — for the endpoints that exist: session/order creation (HTTP 200 + documented field +
-   DB row if any), order status (HTTP 200 + status), webhook success/failure (only if a webhook exists →
-   signed payload → documented response + state update). Diagnose/fix/re-run on failure.
-4. **Constraint edge cases** — only if a validation layer exists: one boundary value per constrained field →
-   assert the doc-specified error.
-5. **Frontend / SDK** — web: drive a transaction with test cards/VPAs, verify the return URL. Mobile: emit a
-   **manual test guide** (can't drive device UI from CLI).
-6. **Integration-stage confirmation** — connected mode only: `juspay_integration_monitoring_status`; flag
-   any critical stage not passing as a go-live blocker.
+Confirm the integration is minimally alive, then hand thorough testing to the dedicated tester.
+
+## SEQUENCE
+
+### 1. Hand off to `jp-validate` (preferred)
+
+The dedicated **`jp-validate`** skill is the thorough tester: it detects the repo's test stack and replicates it (Playwright/Cypress/Jest/Vitest/pytest/…, falling back to curl/bash), prioritizes by payment risk, covers order creation, status reconciliation, webhook signature + idempotency, per-method payloads, constraints and error codes (backend + frontend/SDK), and writes a `test-report.md` with a quality gate. Recommend the user run it after this build.
+
+### 2. Inline smoke (fallback — if the user declines or `jp-validate` isn't available)
+
+Before any live action, confirm the configured key/stage and host/base URL agree (sandbox key ↔ sandbox host, production key ↔ production host); **default to production** when none was named. A dummy/test gateway returned by the MCP is acceptable for integration testing.
+
+Then run a minimal end-to-end smoke against what was built — detect the start command, confirm, bring the server up; create an order/session (assert 2xx + the documented field) and check its status (server-to-server). Diagnose/fix/re-run on failure. This is a liveness check, **not** full coverage — defer the rest to `jp-validate`.
 
 ## VERIFY & RECORD
 
-Report a unified pass/fail table (only the rows that apply), including the environment preflight result.
-Mark the `test` tasks `done`/`blocked`. State anything that couldn't be run and why.
+Either the user is pointed to `jp-validate`, or the inline smoke passed (order create + status). Mark the matching `test` tasks `done`/`blocked`; for the handoff case, leave deeper `test` tasks for `jp-validate` and note it. State anything that couldn't be run and why.
 
 ## NEXT STEP
 
