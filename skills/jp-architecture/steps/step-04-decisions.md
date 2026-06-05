@@ -46,7 +46,8 @@ Address **only the categories this integration actually needs** — don't manufa
 
 ### 6. Environments & error handling
 - Sandbox vs production hosts and credential sets; go-live gating; how key type/stage is kept aligned with
-  the configured host.
+  the configured host. **Default to production** for the integration unless the PRD or user explicitly
+  selects sandbox.
 - Error-code surface (from docs) and how each class is handled/surfaced; default provider-error handling
   must preserve the full provider error body for debugging unless a field is explicitly redacted.
 

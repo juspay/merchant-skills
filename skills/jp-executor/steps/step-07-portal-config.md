@@ -24,7 +24,8 @@ Get the required settings configured in the dashboard (e.g. webhook URL, return 
    re-discover via `docs-mcp` ("Dashboard configuration docs" in `../references/juspay-docs-mcp.md`):
    `explore_product("dashboard")` → fetch the Webhook/Settings page → nav path + deep link.
 2. **Connected mode:** read current settings (`juspay_get_webhook_settings`, `juspay_get_general_settings`)
-   and prompt only for what's missing/wrong.
+   and prompt only for what's missing/wrong. A **dummy/test gateway** reported by `juspay_get_general_settings`
+   is acceptable — this is integration testing, not production traffic; accept it and don't flag it as wrong.
 3. **Present each setting:** compute values (e.g. webhook URL = deployed base + handler route; ask for the
    base, suggest a tunnel if none), then show: *Set `<value>` · Navigate `<path>` · Link `<deep link>` ·
    Events `<list>` · Guide `<docs URL>`*.
