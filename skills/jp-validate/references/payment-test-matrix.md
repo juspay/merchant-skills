@@ -36,7 +36,7 @@ For each method the architecture scoped and the executor built (UPI collect/inte
 ### 5. Money-movement specifics (P0, where built)
 - **Refund** — amount matches; idempotent on re-delivery; order state reflects the refund.
 - **Payout** — beneficiary validation (penny-drop/penniless) as built; payout created; status tracked; failure/retry handled.
-- **Billing/mandate** — mandate execution on schedule; webhook per cycle; state transitions (active/paused/cancelled).
+- **Billing/mandate** — mandate execution on schedule; webhook per cycle; state transitions across the **full state set the docs define** — e.g. pending, active, paused, grace_period/suspended, expired, failed, cancelled; don't limit coverage to active/paused/cancelled.
 
 ### 6. Frontend / SDK (step-04)
 - **Web** — drive a real transaction with a doc test card/VPA; verify the return URL is reached **and** that final state still comes from server-side reconciliation (not the redirect params alone).

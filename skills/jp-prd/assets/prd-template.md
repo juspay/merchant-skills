@@ -122,8 +122,8 @@ status: draft
 ### Payment & integration concerns *(baked in for Juspay)*
 - **Security** — credential/secret handling (no keys in code or logs), webhook **signature verification**, return-URL/redirect integrity, replay protection.
 - **Idempotency & Reconciliation** — order-status reconciliation as source of truth, idempotent webhook handling, duplicate-order prevention, retry semantics.
-- **Environments** — sandbox vs production, test credentials/cards/VPAs, environment promotion and go-live gating.
-- **Payment Methods & Coverage** — which methods (cards, UPI collect/intent, netbanking, wallets, EMI, BNPL) are in scope, and the integration stages/flows each implies.
+- **Environments** — the environments in play (production by default, plus sandbox and any staging/pre-production the merchant uses — not necessarily just two), test credentials/cards/VPAs, environment promotion and go-live gating.
+- **Payment Methods & Coverage** — which methods are in scope (cards, UPI collect/intent, netbanking, wallets, EMI, BNPL/PayLater, NACH, virtual/gift cards, QR, … — whatever the product supports, not limited to these), and the integration stages/flows each implies.
 - **Platform / SDK Surface** — web / iframe-web / native mobile / cross-platform; SDK vs hosted page vs direct API; per-surface requirements.
 - **API Contracts** — request/response field tables for the endpoints in scope (field, type, required, constraints), error-code surface — all doc-derived and URL-cited. Heavy detail can move to `addendum.md`.
 

@@ -26,6 +26,7 @@ compatibility: |
 - **Live merchant data (`juspay-mcp`).** Optional and auth-guarded — see `references/juspay-mcp.md`. **Reuse** the mode + values the PRD/`.decision-log.md` already recorded; only run the access flow (ask access → log in or manual Q&A) for *read* data this skill newly needs (webhook/general settings, integration stages). Never block. Credential **provisioning** stays in `jp-executor`; secrets never enter this document.
 - **Workspace.** `{doc_workspace}` is `{project-root}/docs/juspay/` (create if absent). This skill reads `prd.md` (from `jp-prd`) there and writes `architecture.md` **and** `task-checklist.md` there. `jp-executor` reads all of them.
 - **No config of our own.** No settings file, no language/name resolution. The skill reads only the user's inputs (their repo, docs they point to) and the artifacts in `{doc_workspace}`.
+- **Environment default.** Design for **production** as the default target environment unless the PRD or user explicitly selects sandbox (see `steps/step-04-decisions.md`).
 
 ## WORKFLOW ARCHITECTURE
 
