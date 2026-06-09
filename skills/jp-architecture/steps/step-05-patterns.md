@@ -15,7 +15,7 @@ Define the consistency rules `jp-executor` (and any agent) must follow so the in
 Facilitate a decision for each that applies:
 
 ### 1. Configuration & secrets
-- Env var naming convention (e.g. `JUSPAY_API_KEY`, `JUSPAY_MERCHANT_ID`, `JUSPAY_CLIENT_ID`, webhook auth).
+- Env var naming convention (e.g. `JUSPAY_API_KEY`, `JUSPAY_MERCHANT_ID`, `JUSPAY_CLIENT_ID`, `JUSPAY_BASE_URL`/host selector, webhook auth).
 - Where config is read; never hardcode credentials; never log secrets.
 
 ### 2. Webhook & idempotency

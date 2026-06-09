@@ -45,10 +45,10 @@ Order: **Brain dump → Codebase + env scan → Merchant access (juspay-mcp) →
 **Codebase + env scan.** Read the target codebase and environment to ground the PRD in reality — do not ask for what you can detect:
 - **Stack & surfaces:** language/framework, package manager, backend vs frontend presence, mobile vs web (signals like `package.json`, `pubspec.yaml`, `requirements.txt`, `go.mod`, `AndroidManifest.xml`, `*.xcodeproj`, `index.html`).
 - **Existing payment code:** any current payment/order/checkout handling, webhook routes, order/payment DB schemas.
-- **Environment:** `.env`/config files for existing provider config, environments (sandbox/prod), secret-management style — **never read or echo secret values**, only note which keys exist.
+- **Environment:** `.env`/config files for existing provider config, environments (sandbox/prod), secret-management style — **never read or echo secret values**, only note which keys exist. **Default to production** as the target environment unless the user explicitly names sandbox; record this in the PRD's Environments section.
 Reflect what you found back to the user for confirmation.
 
-**Light ideation.** Before converging, run a short divergent pass *with the user* on which Juspay products, payment methods, and flows could serve their goal (checkout, UPI collect/intent, cards, netbanking, wallets, payouts, refunds, subscriptions). Keep it lightweight — a handful of options surfaced and pruned together, not a full brainstorming session. This replaces a standalone brainstorming step.
+**Light ideation.** Before converging, run a short divergent pass *with the user* on which Juspay products and flows could serve their goal (e.g. checkout, payouts, refunds, subscriptions/recurring mandates, reconciliation — illustrative starting points, not an exhaustive menu to pick from). The integration is **payment-method agnostic** — which methods a merchant enables is dashboard/runtime configuration, not a PRD-time choice — so don't ask the user to pick payment methods. Keep it lightweight — a handful of options surfaced and pruned together, not a full brainstorming session. This replaces a standalone brainstorming step.
 
 **Merchant access (juspay-mcp).** Establish the run's mode, following `references/juspay-mcp.md`. **First ask whether the user has Juspay dashboard access:**
 - **Yes → log in** (`authenticate` → `complete_authentication`). On success (**connected mode**), pull `juspay_get_merchant_details` to read `merchant_id`, `client_id` (default = `merchant_id`), and `integration_type` — these help converge on the product/integration shape below. On any failure, fall back to manual.
@@ -63,7 +63,7 @@ Record the chosen mode and each value with its provenance (`mcp` | `user` | `man
 3. **Confirm via docs-mcp:** `explore_product(slug)` for the chosen product's doc index (reconcile slug/shape/platforms against it), then `doc_fetch_tool(url)` on the pages that define credentials, request/response fields, error codes, and webhook structure.
 Extract from the docs what the PRD needs to be *grounded* (not to generate code): the domain vocabulary for the Glossary, the capabilities and constraints that shape FRs, the error/edge surface, and the integration shape (hosted page / headless SDK / direct API). Tag each extracted fact with its source URL.
 
-**Elicitation, not direction.** Discovery pulls the user's vision out; it does not insert yours. Open-ended "tell me about X" beats multiple choice. When you find yourself naming MVP cuts or proposing phases, stop — hand the pen back. Infer-and-confirm ("I'm assuming you only need card + UPI for v1 — right?") is fine. If the user wants a section explored more deeply or weighed from multiple angles, do that inline.
+**Elicitation, not direction.** Discovery pulls the user's vision out; it does not insert yours. Open-ended "tell me about X" beats multiple choice. When you find yourself naming MVP cuts or proposing phases, stop — hand the pen back. Infer-and-confirm ("I'm assuming v1 is web checkout only, no mobile surface — right?") is fine. If the user wants a section explored more deeply or weighed from multiple angles, do that inline.
 
 **Working mode.** Offer the choice in the user's language, using the runtime's native choice UI if available:
 

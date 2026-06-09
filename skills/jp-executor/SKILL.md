@@ -23,6 +23,7 @@ You implement a Juspay payment integration **directly in the codebase**, driven 
 - **Debuggability default.** Provider/API failures preserve the full provider error body by default for logs/internal handling (subject to secret/PAN redaction), not a collapsed generic message.
 - **Workspace.** `{doc_workspace}` is `{project-root}/docs/juspay/` — reads `prd.md`, `architecture.md`, and `task-checklist.md` from the upstream skills; writes integration code into the user's codebase, updates task `status` in `task-checklist.md` as it goes, and writes a summary back to `{doc_workspace}`.
 - **No config of our own.** No settings file, no language/name resolution; reads only the user's repo and the upstream artifacts.
+- **Environment default.** Target **production** by default unless the architecture/PRD/user explicitly selects sandbox; keep key type/stage aligned with the configured host (see `steps/step-02-credentials.md`).
 
 ## On Activation
 

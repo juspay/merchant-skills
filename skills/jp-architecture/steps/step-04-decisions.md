@@ -25,7 +25,7 @@ Address **only the categories this integration actually needs** — don't manufa
 - What the client receives (e.g. `sdkPayload`) and how it launches the payment.
 
 ### 1b. Client `process` payload — per payment method *(SDK/headless products)*
-- For **each** in-scope method (UPI collect/intent, card, netbanking, wallet, …), fetch the method's `process` page and extract the **exact `process` request shape**: required fields, field types, enums, and method-specific constraints. Record per method, with the source URL.
+- For **each** in-scope method, fetch the method's `process` page and extract the **exact `process` request shape**: required fields, field types, enums, and method-specific constraints. Record per method, with the source URL. Cover every method the PRD scoped — do not truncate to the common ones (UPI collect/intent, card, netbanking, wallet); EMI, BNPL/PayLater, UPI Autopay, gift card, QR, and others count too.
 - This carries the same field-level rigor as the backend APIs. Do not collapse "all methods" into one generic payload, and do not push the extraction to the executor.
 
 ### 2. Credentials & secrets handling
@@ -45,9 +45,10 @@ Address **only the categories this integration actually needs** — don't manufa
 - Order/payment schema (extend existing vs new table) and the fields to persist (from docs constraints). Decide format only; executor implements.
 
 ### 6. Environments & error handling
-- Sandbox vs production hosts and credential sets; go-live gating; how key type/stage is kept aligned with
+- Host and credential set **per environment** — production by default, plus sandbox and any staging/pre-production
+  the merchant actually uses; don't assume exactly two. Go-live gating; how key type/stage is kept aligned with
   the configured host. **Default to production** for the integration unless the PRD or user explicitly
-  selects sandbox.
+  selects another environment.
 - Error-code surface (from docs) and how each class is handled/surfaced; default provider-error handling
   must preserve the full provider error body for debugging unless a field is explicitly redacted.
 

@@ -40,7 +40,7 @@ The mode and these values flow downstream via the artifacts (`prd.md`, `architec
 
 ## Data points by skill
 
-Expected live tools (names from the existing `integrate` skill; the real set appears only after auth):
+Expected live tools (names from the existing `integrate` skill; the real set appears only after auth). These per-skill lists are the **known** read tools, **not an exhaustive allowlist** — after auth, enumerate the tools the MCP actually exposes and use any additional relevant *read* tools it offers; don't skip a useful call just because it isn't listed here:
 
 - **jp-prd** *(read)* — `juspay_get_merchant_details` → `merchant_id`, `client_id` (default = `merchant_id`), `integration_type` (helps converge on the product/integration shape). Optional: current settings to know existing state.
 - **jp-architecture** *(read)* — `juspay_get_webhook_settings` (configured? events), `juspay_get_general_settings` (return URL configured?), `juspay_integration_monitoring_status` (integration stages / flows to cover).
