@@ -21,9 +21,10 @@ You implement a Juspay payment integration **directly in the codebase**, driven 
 - **SDK/headless hard gate.** No client payment-method code is written until that method's `process` payload page is fetched in-session and its exact request shape is in hand.
 - **Secrets boundary.** Credentials (API keys, webhook auth) live only in memory and `.env`/secret stores — never in the PRD, architecture doc, logs, or command output.
 - **Debuggability default.** Provider/API failures preserve the full provider error body by default for logs/internal handling (subject to secret/PAN redaction), not a collapsed generic message.
-- **Workspace.** `{doc_workspace}` is `{project-root}/docs/juspay/` — reads `prd.md`, `architecture.md`, and `task-checklist.md` from the upstream skills; writes integration code into the user's codebase, updates task `status` in `task-checklist.md` as it goes, and writes a summary back to `{doc_workspace}`.
+- **Workspace.** `{doc_workspace}` is `{project-root}/docs/juspay/` — reads `prd.md`, `architecture.md`, and `task-checklist.md` from the upstream skills; writes integration code into the user's codebase, updates task `status` in `task-checklist.md` as it goes, and writes a summary back to `{doc_workspace}`. In split-repo runs it also reads an incoming `handoff-<this_side>.md` (if present) and writes the portable `handoff-<other_side>.md`.
 - **No config of our own.** No settings file, no language/name resolution; reads only the user's repo and the upstream artifacts.
-- **Environment default.** Target **production** by default unless the architecture/PRD/user explicitly selects sandbox; keep key type/stage aligned with the configured host (see `steps/step-02-credentials.md`).
+- **Production enforced.** Always target the **production** environment; don't ask which environment to use or offer sandbox. Only use a non-production environment if the user explicitly and unpromptedly requests it. Keep key type/stage aligned with the configured host (see `steps/step-02-credentials.md`).
+- **Split-repo aware.** Build only `side ∈ {this_side, shared}` tasks; `other_side` tasks are not implemented here — they're carried into `handoff-<other_side>.md` for the other repo's agent. If an incoming `handoff-<this_side>.md` exists, build this side to its contract and verify conformance. See `references/split-integration.md`.
 
 ## On Activation
 
@@ -45,7 +46,7 @@ Read fully and follow: `./steps/step-01-init.md`. The step chain:
 
 > Thorough testing lives in the dedicated **`jp-validate`** skill (detects the repo's test stack and replicates it, risk-prioritized payment coverage, writes `test-report.md`). This executor does a liveness smoke and points to it; run `jp-validate` after the build.
 
-**Steps are conditional.** Each non-universal step opens with an APPLICABILITY gate and **self-skips** when the `task-checklist.md` (authoritative) and `architecture.md` contain no work of its kind — no webhook task → no webhook handler; web/API surface → no native setup; nothing to set in the dashboard → no portal step. The executor does **only what this integration needs**, never manufacturing webhook/DB/native/portal work an integration doesn't require.
+**Steps are conditional.** Each non-universal step opens with an APPLICABILITY gate and **self-skips** when the `task-checklist.md` (authoritative) and `architecture.md` contain no work of its kind — no webhook task → no webhook handler; web/API surface → no native setup; nothing to set in the dashboard → no portal step. The executor does **only what this integration needs**, never manufacturing webhook/DB/native/portal work an integration doesn't require. In a `split` run, "has an X task" means an X task **for this side** (`side ∈ {this_side, shared}`); `other_side` tasks are already marked `skipped` in step 1 and never trigger a step here.
 
 This is **action-oriented**, not a facilitation: implement, but **checkpoint before risky/external actions** (credential provisioning, DB schema changes, portal configuration, starting the server/tests).
 

@@ -4,6 +4,9 @@ inputDocuments: []
 workflowType: 'jp-architecture'
 created: ''
 juspay_products: []
+topology: 'single-repo'   # single-repo | split (from prd.md)
+this_side: 'fullstack'    # backend | frontend | fullstack
+other_side: 'none'        # backend | frontend | none
 status: 'in-progress'
 ---
 

@@ -8,7 +8,7 @@ Frontmatter:
 ---
 source_checklist: docs/juspay/task-checklist.md
 created: <today>
-environment: production | sandbox
+environment: production   # enforced; a non-production env appears only if the user explicitly required it
 juspay_mcp_mode: connected | manual
 quality_gate: PASS | CONCERNS | FAIL
 ---
@@ -20,8 +20,9 @@ quality_gate: PASS | CONCERNS | FAIL
 # Juspay Integration — Test Report
 
 ## Run context
-- **Environment:** <production | sandbox> (host) · key/stage alignment: <ok | mismatch>
+- **Environment:** <production> (host) · key/stage alignment: <ok | mismatch>
 - **juspay-mcp mode:** <connected | manual>
+- **Topology:** <single-repo | split> · this_side: <backend | frontend | fullstack> · other_side: <backend | frontend | none>
 - **Test stack detected:** <Playwright / pytest / … or "none — inline curl/bash">
 - **Surfaces tested:** <backend | frontend/SDK | native | fullstack>
 - **Test files written:** <paths, or "none (inline)">
@@ -48,6 +49,10 @@ quality_gate: PASS | CONCERNS | FAIL
 - [ ] Idempotency proven by duplicate-delivery test
 - [ ] Status reconciliation uses server-to-server Order Status (not client result)
 - [ ] Environment/key/host aligned
+
+## Cross-side contract conformance *(split runs only — omit otherwise)*
+- [ ] This side honors the Cross-Side Contract (endpoint/request/response/`sdkPayload` shapes match)
+- **Cross-side E2E:** not runnable here — the `<other_side>` repo is absent. Full end-to-end requires both repos; tracked as a manual/gap below.
 
 ## Integration stage *(connected mode only — omit otherwise)*
 <juspay_integration_monitoring_status: stages passing / not passing; critical gaps flagged as go-live blockers>

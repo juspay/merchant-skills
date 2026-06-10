@@ -29,7 +29,9 @@ Do **not** fabricate tests without a built integration.
 
 ### 2. Load the artifacts
 
-Read `architecture.md` (decisions, in-scope methods, surfaces, reconciliation rule, webhook events/signature approach, constraint fields, error-code surface, environments) and `prd.md` (FRs/journeys for traceability). Read `task-checklist.md` (the `test` tasks and their `acceptance` + `doc-refs`) and `integration-summary.md` if present (routes, SDK init, DB, native setup, packages — the ground truth of what was built). Note the authoritative Juspay doc URLs to re-fetch at test time.
+Read `architecture.md` (decisions, doc-derived methods, surfaces, reconciliation rule, webhook events/signature approach, constraint fields, error-code surface, environments) and `prd.md` (FRs/journeys for traceability). Read `task-checklist.md` (the `test` tasks and their `acceptance` + `doc-refs`) and `integration-summary.md` if present (routes, SDK init, DB, native setup, packages — the ground truth of what was built). Note the authoritative Juspay doc URLs to re-fetch at test time.
+
+Pick up the **topology** (`topology`/`this_side`/`other_side`) from `architecture.md`/`prd.md`. In a `split` run, also read the **Cross-Side Contract** — from `architecture.md`, an incoming `{doc_workspace}/handoff-<this_side>.md`, or the `handoff-<other_side>.md` this repo's executor produced — so step 2 can add contract-conformance checks (see `../references/split-integration.md`).
 
 Pick up the **juspay-mcp mode** the upstream skills recorded (see `../references/juspay-mcp.md`) — reuse it; **don't re-ask** the access question. Only run the access flow later if a test genuinely needs live data (e.g. integration-stage status) the artifacts don't carry.
 
@@ -43,7 +45,7 @@ Confirm against the codebase (never read secret values): which routes/endpoints 
 
 ### 5. Produce the test-target inventory
 
-Emit a concise inventory: surfaces present, endpoints/handlers found, in-scope methods that were built, detected runner(s) per surface (or "inline fallback"), and the juspay-mcp mode. This is the input to test design.
+Emit a concise inventory: surfaces present, endpoints/handlers found, methods that were built, detected runner(s) per surface (or "inline fallback"), and the juspay-mcp mode. This is the input to test design.
 
 ## VERIFY & RECORD
 

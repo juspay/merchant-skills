@@ -34,6 +34,8 @@ Confirm what you found and ask if the user wants to add anything. Then load ALL 
 
 From the PRD / `.decision-log.md`, also pick up the **juspay-mcp mode** (`connected` | `manual`) and any recorded merchant data (`merchant_id`, `client_id`, `integration_type`) with their provenance — reuse these and do not re-ask. If the mode wasn't established upstream and a later step needs live settings, run the access flow then (see `references/juspay-mcp.md`).
 
+Also pick up the **topology** (`topology`/`this_side`/`other_side`) from the PRD frontmatter (re-derive from the codebase only if absent — see `references/split-integration.md`). **Incoming-handoff check:** look for `{doc_workspace}/handoff-<this_side>.md` (or a path the user offers) produced by the other repo's run. If present, load it — its **Cross-Side Contract is authoritative**: the architecture must lock the seam from it (don't redesign), and downstream decisions build this side to those exact endpoint/`sdkPayload` shapes.
+
 ### 3. Validate the required input (hard gate)
 
 If **no PRD** is found and the user cannot point to one:
@@ -44,7 +46,7 @@ Do **not** proceed without a PRD.
 
 ### 4. Create the architecture document
 
-Copy `../architecture-decision-template.md` to `{doc_workspace}/architecture.md` (create the directory). Fill frontmatter: `created` (today's date), `inputDocuments`, `stepsCompleted: [1]`, `juspay_products` (from the PRD frontmatter if present).
+Copy `../architecture-decision-template.md` to `{doc_workspace}/architecture.md` (create the directory). Fill frontmatter: `created` (today's date), `inputDocuments`, `stepsCompleted: [1]`, `juspay_products` (from the PRD frontmatter if present), and `topology`/`this_side`/`other_side` (carried from the PRD).
 
 ### 5. Report and offer to continue
 

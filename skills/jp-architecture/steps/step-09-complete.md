@@ -35,6 +35,10 @@ completedAt: '<today>'
 > Live merchant data (credential provisioning, dashboard webhook/return-URL config, stage checks) is
 > handled by jp-executor against `juspay-mcp`, with a manual fallback if you can't authenticate."
 
+If `topology: split`, add: "This run builds **`this_side`** only. After `jp-executor` finishes, it writes a
+portable **`handoff-<other_side>.md`** (the as-built Cross-Side Contract + what's done + the other side's
+task list) — hand that file to the agent working the **`other_side`** repo so it can build independently."
+
 Offer to answer any questions about the architecture or checklist.
 
 ## WORKFLOW COMPLETE

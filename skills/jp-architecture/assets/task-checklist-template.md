@@ -22,6 +22,7 @@ Each task is a checkbox item with sub-bullets:
 ```markdown
 - [ ] **T<N>. <imperative title>**
   - **type:** install | code | webhook | db | config | env | native-setup | test | manual-dashboard
+  - **side:** backend | frontend | shared
   - **depends-on:** [T<i>, …] or —
   - **files:** <files to create/modify> or —
   - **params:** <inputs needed> + provenance (`mcp` | `user` | `manual-dashboard` | `doc-derived`)
@@ -32,7 +33,14 @@ Each task is a checkbox item with sub-bullets:
 
 For SDK/headless integrations, method-specific client code should be represented **per payment method** (or
 with explicit method-level substeps), and each such task must include that method's `process` payload page in
-`doc-refs`.
+`doc-refs`. The method set is **doc-derived** (the `process` pages the product exposes) — never a user-asked
+list; the integration is method-agnostic. Hosted/redirect products have no per-method client task.
+
+**`side` tagging (always emit it).** `backend` = server/S2S work; `frontend` = client/SDK/web/native work;
+`shared` = cross-cutting (env var *names*, status mapping, the contract itself). In a `split` run, `jp-executor`
+runs only `side ∈ {this_side, shared}` and carries `side == other_side` tasks into `handoff-<other_side>.md`
+(see `references/split-integration.md`). In a `single-repo` run, every side runs locally — the tags still
+document ownership.
 
 ## Ordering
 
@@ -47,18 +55,18 @@ portal configuration (manual-dashboard) → tests`.
 
 ```markdown
 - [ ] **T1. Add Juspay env vars**
-  - type: env · depends-on: — · files: `.env`, `.env.example`
+  - type: env · side: shared · depends-on: — · files: `.env`, `.env.example`
   - params: `JUSPAY_MERCHANT_ID` (mcp|user), `JUSPAY_CLIENT_ID` (default = merchant_id)
   - acceptance: vars present; no secret values committed · doc-refs: — · status: todo
 - [ ] **T2. Provision API key**
-  - type: config · depends-on: — · params: api key (mcp `juspay_create_api_key`, or `manual-dashboard`)
+  - type: config · side: backend · depends-on: — · params: api key (mcp `juspay_create_api_key`, or `manual-dashboard`)
   - acceptance: key stored in `.env` only, never logged; target environment/host recorded and consistent · doc-refs: <key/setup page> · status: todo
 - [ ] **T4. Implement UPI collect process payload**
-  - type: code · depends-on: [T3] · files: `src/payments/juspay/*`
+  - type: code · side: frontend · depends-on: [T3] · files: `src/payments/juspay/*`
   - params: UPI collect fields/constraints (`doc-derived`)
   - acceptance: UPI collect request shape matches docs exactly; method code references the fetched payload page · doc-refs: <UPI collect process page> · status: todo
 - [ ] **T7. Configure webhook URL in dashboard**
-  - type: manual-dashboard · depends-on: [T5]
+  - type: manual-dashboard · side: backend · depends-on: [T5]
   - params: webhook URL + events; **nav path** + **deep link** (from architecture Portal Configuration)
   - acceptance: user confirms the webhook is saved in the dashboard · doc-refs: <dashboard webhook page> · status: todo
 ```

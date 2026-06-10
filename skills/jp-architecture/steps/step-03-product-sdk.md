@@ -27,16 +27,16 @@ The PRD named the product(s) in scope and the surfaces; the codebase scan (from 
 - Classify `$PRODUCT_TYPE` (`sdk` | `api-only` | `hybrid`) from the doc structure.
 - **Split the integration pages into two tracks** so neither gets shortchanged downstream:
   - **Backend (S2S) pages** — **all** S2S pages the product's doc index lists; do not truncate to the examples. Beyond the common ones (session/order creation, order status, refunds, webhooks), include whatever the product exposes — Create/Get Customer, List Payment Methods, beneficiary APIs (payouts), dispute/chargeback, settlement/reconciliation, mandate-execution (billing), etc. Enumerate what the index actually contains.
-  - **Client SDK pages** — `initiate` plus the **per-payment-method `process` payload** pages, one entry per in-scope method; do not truncate to the examples. Cover whatever the PRD scoped (UPI collect/intent, card, netbanking, wallet, EMI, BNPL/PayLater, UPI Autopay, gift card, QR, …). For SDK/headless products these are the most non-standard, error-prone surface. They are NOT optional appendix reading to be deferred to the executor.
+  - **Client SDK pages** — `initiate` plus the **per-payment-method `process` payload** pages. Derive the method set from the **product's docs** (the `process` payload pages the product exposes — UPI collect/intent, card, netbanking, wallet, EMI, BNPL/PayLater, UPI Autopay, gift card, QR, …), enumerating one entry per page; do not truncate to the examples. **Never ask the user which methods** — method enablement is merchant dashboard configuration; the integration is method-agnostic. Hosted/redirect products render methods server-side and have **no** per-method client pages. For headless/SDK products these are the most non-standard, error-prone surface — NOT optional appendix reading to be deferred to the executor.
 
 ### 3. Resolve platform / SDK variant
 
 - For SDK products: confirm the platform (web/iframe-web/android/ios/flutter/react-native/cordova/capacitor) against the codebase, then disambiguation the docs require (e.g. Android Java vs Kotlin; iOS Swift vs Obj-C; web vs iframe-web).
 - For api-only: no platform question; confirm backend language from the codebase.
 
-### 4. Single-side check
+### 4. Single-side / split-repo check
 
-If the product needs both backend and client and only one side exists in the codebase, surface it and ask whether to proceed single-side (with an other-side TODO recorded later) or stop.
+If the product needs both backend and client but only one side exists in this folder, confirm the **topology** (`split`) and set `this_side`/`other_side` (reuse the PRD's values; see `references/split-integration.md`). Don't ask "proceed or stop" — proceeding single-side is the expected path: design the **full** integration but build only this side here, partition the task-checklist by `side` (step 8), and author the **Cross-Side Contract** (step 4 / step 6) so the other side can be built independently. If an incoming `handoff-<this_side>.md` was ingested at step 1, the contract is **fixed from it** — reconcile the chosen product/shape against it rather than redesigning the seam.
 
 ### 5. Content to append
 
@@ -55,7 +55,7 @@ If the product needs both backend and client and only one side exists in the cod
 ### Base Integration Pages (authoritative, in order)
 **Backend (S2S):** {{numbered list of ALL S2S pages the product's doc index lists (page titles + URLs) — do not truncate to common examples like session/order, status, refunds, webhooks; include customer, list-payment-methods, beneficiary, dispute/chargeback, settlement/reconciliation, mandate-execution pages whenever the product exposes them}}
 **Client SDK:** {{`initiate` page + URL}}
-**Per-method `process` payloads (SDK/headless):** {{one entry per in-scope method — method name → page title + URL}}
+**Per-method `process` payloads (SDK/headless):** {{one entry per method the docs expose — method name → page title + URL}}
 
 ### Rationale
 {{why this product/shape fits the PRD's goal, methods, and surfaces}}
