@@ -24,6 +24,8 @@ From `../references/payment-test-matrix.md`, list candidate items, keeping only 
 
 Drop anything failing any leg, and note why (e.g. "refund — in scope but not built → skip").
 
+**Split runs — add contract-conformance items.** When `topology: split`, add items that assert this side honors the **Cross-Side Contract**: a backend repo returns the exact session/order response shape the contract promises (real `sdkPayload`/order id/fields); a frontend repo calls the BE endpoint with the exact request shape and consumes the response per the contract. The **cross-side end-to-end** transaction (BE+FE together) can't be driven here — the other repo is absent — so record it as a documented **manual/gap** in the report, not a pass.
+
 ### 2. Assign priority (P0–P3)
 
 Use the matrix: **P0** = order/session creation, server-to-server status reconciliation, payment auth, money movement, webhook signature verification; **P1** = primary per-method happy paths, webhook idempotency, return-URL integrity; **P2** = constraint boundaries, secondary methods, documented error-code paths; **P3** = polish.
@@ -39,7 +41,7 @@ For each item record the requirement it covers — the `task-checklist.md` `test
 
 ### 5. Environment preflight
 
-Confirm the configured key/stage and host/base URL agree (sandbox key ↔ sandbox host, production key ↔ production host). **Default to production** when no environment was named. A **dummy/test gateway** returned by the MCP is acceptable — this is integration testing. Block (don't silently pass) any item whose environment can't be satisfied; mark its `test` task `blocked` with the reason.
+Confirm the configured key/stage and host/base URL agree (production key ↔ production host). **Production is enforced** — use production and never ask which environment to use. A **dummy/test gateway** returned by the MCP is acceptable — this is integration testing. Block (don't silently pass) any item whose environment can't be satisfied; mark its `test` task `blocked` with the reason.
 
 ### 6. Checkpoint the plan
 

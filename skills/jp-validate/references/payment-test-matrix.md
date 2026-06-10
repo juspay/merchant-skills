@@ -9,7 +9,7 @@ Order execution **smoke → P0 → P1 → P2 → P3**. A P0 failure blocks the q
 | Pri | What | Why |
 |-----|------|-----|
 | **P0** | Order/session creation · server-to-server **status reconciliation** · payment authorization · **money movement** (capture/refund/payout) · **webhook signature verification** | Revenue-critical and trust-critical — a bug here loses or mis-moves money, or trusts a forged result. |
-| **P1** | Primary in-scope payment-method happy paths (the methods the PRD names) · webhook **idempotency** · return-URL integrity | Core journeys the integration exists to serve. |
+| **P1** | Primary payment happy paths for the methods the executor actually built (doc-derived, never a PRD-named list) · webhook **idempotency** · return-URL integrity | Core journeys the integration exists to serve. |
 | **P2** | Constraint/boundary validation · secondary methods · documented error-code paths · retry/timeout handling | Correctness at the edges; degrades UX if wrong but not silently lossy. |
 | **P3** | Polish, optional flows, cosmetic states | Low risk. |
 
@@ -20,8 +20,8 @@ Order execution **smoke → P0 → P1 → P2 → P3**. A P0 failure blocks the q
 - **Status reconciliation** — the **server-to-server Order Status API is the source of truth**; assert the app fetches it and never persists final state from the client/SDK result alone. Verify the Juspay-status → app-status mapping matches the architecture's table.
 - **Duplicate prevention** — a redelivered terminal event/callback does not create a second order or double-apply state.
 
-### 2. Per-method `process` payloads (P1, one per in-scope method)
-For each method the architecture scoped and the executor built (UPI collect/intent, card, netbanking, wallet, EMI, BNPL, …): assert the client `process` request matches the fetched payload page **field for field** — required fields present, types/enums correct, method-specific constraints honored. Use **test cards/VPAs from the docs**, never invented PANs/VPAs. Never assert on or log a raw PAN.
+### 2. Per-method `process` payloads (P1, one per built method)
+For each method the executor actually built (a doc-derived set — never a PRD-named method list; UPI collect/intent, card, netbanking, wallet, EMI, BNPL, …): assert the client `process` request matches the fetched payload page **field for field** — required fields present, types/enums correct, method-specific constraints honored. Use **test cards/VPAs from the docs**, never invented PANs/VPAs. Never assert on or log a raw PAN.
 
 ### 3. Webhooks (P0 signature / P1 idempotency)
 - **Signature verification** — a tampered/invalid-signature payload is **rejected**; a correctly signed one is accepted. (Secret comes from `.env`/juspay-mcp, never inlined.)
@@ -38,6 +38,12 @@ For each method the architecture scoped and the executor built (UPI collect/inte
 - **Payout** — beneficiary validation (penny-drop/penniless) as built; payout created; status tracked; failure/retry handled.
 - **Billing/mandate** — mandate execution on schedule; webhook per cycle; state transitions across the **full state set the docs define** — e.g. pending, active, paused, grace_period/suspended, expired, failed, cancelled; don't limit coverage to active/paused/cancelled.
 
+### 5b. Cross-side contract conformance (P1, split repos only)
+When `topology: split`, assert this side honors the **Cross-Side Contract** (see `split-integration.md`):
+- **Backend repo** — the session/order endpoint returns the exact response shape the contract promises (real `sdkPayload`/order id/fields, types); the payment-result endpoint accepts the documented request and returns the documented final status.
+- **Frontend repo** — the client calls the BE endpoint with the exact request shape and consumes the response/`sdkPayload` per the contract; the return/result call matches.
+- **Cross-side E2E** (BE+FE together) is **not** runnable here (other repo absent) → record as a documented manual/gap, never a silent pass.
+
 ### 6. Frontend / SDK (step-04)
 - **Web** — drive a real transaction with a doc test card/VPA; verify the return URL is reached **and** that final state still comes from server-side reconciliation (not the redirect params alone).
 - **Hosted SDK** (e.g. Hyper Checkout) — modal/overlay launches; callback fires on success/failure; reconciliation follows.
@@ -48,7 +54,7 @@ For each method the architecture scoped and the executor built (UPI collect/inte
 - **No PAN/secret in logs** — provider error bodies are preserved for debugging but PAN/secrets are redacted; no API key, webhook password, or full card number appears in logs, the report, or command output.
 - **Signature enforced** — webhook (and return-URL HMAC where used) verification is actually wired, not stubbed.
 - **Idempotency proven** — by an actual duplicate-delivery test, not assumed.
-- **Environment alignment** — key/stage ↔ host agree; production by default unless told sandbox; a dummy/test gateway from the MCP is acceptable for integration testing.
+- **Environment alignment** — key/stage ↔ host agree; **production is enforced** (no environment prompt); a dummy/test gateway from the MCP is acceptable for integration testing.
 
 ## Test-quality Definition of Done
 Every **persisted** test must be:

@@ -21,15 +21,15 @@ status: draft
 [1 paragraph: who this PRD is for (the team integrating Juspay, plus the downstream `jp-architecture` and `jp-executor` runs), how it's structured (Glossary-anchored vocabulary, capabilities grouped with FRs nested, assumptions tagged inline and indexed). Name the Juspay docs this PRD is grounded in and where they live (source URLs). This PRD captures what the integration must do and why — not how (that is `jp-architecture`).]
 
 ## 1. Integration Goal
-[2-3 paragraphs: what is being integrated and why — which payment outcomes the merchant needs (accept card/UPI payments, run payouts, take recurring mandates, issue refunds), on which surfaces, for whom. Compelling enough to stand alone.]
+[2-3 paragraphs: what is being integrated and why — which payment outcomes the merchant needs (accept payments, run payouts, take recurring mandates, issue refunds), on which surfaces, for whom. Describe outcomes/flows, **not** which payment methods — method enablement is dashboard configuration, not a PRD choice. Compelling enough to stand alone.]
 
 ## 2. Integration Context
 
 ### 2.1 Integration Objective
-[Bulleted. What the integrating system needs to achieve: accept UPI/card/etc on which surfaces, launch which Juspay product shape, persist which payment/order states, support which callbacks/webhooks/refunds. Keep it concrete.]
+[Bulleted. What the integrating system needs to achieve: accept payments on which surfaces, launch which Juspay product shape, persist which payment/order states, support which callbacks/webhooks/refunds. Keep it concrete — flows and surfaces, not a payment-method list.]
 
-### 2.2 Out-of-Scope Methods / Surfaces (v1) *(add when the boundary is non-obvious)*
-[Payment methods, surfaces, flows, or environment modes explicitly not served in v1.]
+### 2.2 Out-of-Scope Surfaces / Flows (v1) *(add when the boundary is non-obvious)*
+[Surfaces, flows, or environment modes explicitly not served in v1. Don't enumerate payment methods — those are enabled in the dashboard, not scoped here.]
 
 ### 2.3 Key Payment Journeys
 *Integration flow narratives. Numbered globally UJ-1..UJ-N. Describe the real flow the integration must support. FRs reference flows by ID inline ("realizes UJ-2").*
@@ -88,7 +88,7 @@ status: draft
 ## 6. MVP Scope
 
 ### 6.1 In Scope
-[Bulleted, crisp — products, payment methods, surfaces, flows for v1.]
+[Bulleted, crisp — products, payment methods, surfaces, flows for v1. **If `topology: split`** (frontmatter), state which side this repo builds (`this_side`) and that the other side (`other_side`) is built in a separate repo against the Cross-Side Contract — handed off via `handoff-<other_side>.md`.]
 
 ### 6.2 Out of Scope for MVP
 [Bulleted. Each item with a one-line reason if it matters; mark v2/v3 deferrals. `[NOTE FOR PM]` where a deferred item is load-bearing.]
@@ -96,14 +96,15 @@ status: draft
 ## 7. Integration Readiness & Verification
 *What downstream architecture/executor must be able to verify before calling this integration complete.*
 
-- **Readiness-1**: In-scope payment methods/surfaces are explicitly listed and each maps to one or more FRs.
+- **Readiness-1**: In-scope surfaces and flows are explicitly listed and each maps to one or more FRs. (Payment methods are **not** listed — they're dashboard-enabled and method-agnostic.)
 - **Readiness-2**: Final payment state comes from the intended source of truth (for example, Order Status reconciliation, webhook, or documented synchronous response), not an ambiguous client signal.
-- **Readiness-3**: The environments required for v1 are named (sandbox, production, or both), including any return URL / webhook / callback expectations that affect implementation.
+- **Readiness-3**: Production is the target environment (a non-production environment appears only if the user explicitly required it), including any return URL / webhook / callback expectations that affect implementation.
 - **Readiness-4**: Error/failure paths that materially affect the integration are called out (declines, expired collect request, webhook delay/failure, refund failure, etc.).
 - **Readiness-5**: Open questions that would block architecture or executor are surfaced in §8 instead of being implied.
+- **Readiness-6** *(split-repo only)*: When `topology: split`, the BE↔FE seam the other repo depends on is identified at the FR level so `jp-architecture` can lock it into the Cross-Side Contract (session/order handoff, payment-result return, reconciliation/webhook ownership).
 
 ## 8. Open Questions
-[Numbered. Unknowns that become follow-up research or tickets — not silent gaps. E.g. "Is a webhook URL already configured on the merchant account?" "Which environments (sandbox/prod) must v1 support?"]
+[Numbered. Unknowns that become follow-up research or tickets — not silent gaps. E.g. "Is a webhook URL already configured on the merchant account?" "Is the production API key already provisioned, or does it need creating?"]
 
 ## 9. Assumptions Index
 *Every `[ASSUMPTION]` from the document, surfaced for explicit confirmation:*
@@ -122,8 +123,8 @@ status: draft
 ### Payment & integration concerns *(baked in for Juspay)*
 - **Security** — credential/secret handling (no keys in code or logs), webhook **signature verification**, return-URL/redirect integrity, replay protection.
 - **Idempotency & Reconciliation** — order-status reconciliation as source of truth, idempotent webhook handling, duplicate-order prevention, retry semantics.
-- **Environments** — the environments in play (production by default, plus sandbox and any staging/pre-production the merchant uses — not necessarily just two), test credentials/cards/VPAs, environment promotion and go-live gating.
-- **Payment Methods & Coverage** — which methods are in scope (cards, UPI collect/intent, netbanking, wallets, EMI, BNPL/PayLater, NACH, virtual/gift cards, QR, … — whatever the product supports, not limited to these), and the integration stages/flows each implies.
+- **Environments** — **production is the enforced target**; document the production host/credentials, test credentials/cards/VPAs, and go-live gating. Note a non-production environment (sandbox/staging) only if the user explicitly required one — don't ask.
+- **Coverage & Flows** — the payment **flows/stages** in scope (one-time payment, recurring/mandate, refund, payout, reconciliation), surface by surface. **Do not enumerate or select payment methods** — method enablement is per-merchant dashboard configuration and the integration is method-agnostic; the product's docs determine any per-method handling downstream.
 - **Platform / SDK Surface** — web / iframe-web / native mobile / cross-platform; SDK vs hosted page vs direct API; per-surface requirements.
 - **API Contracts** — request/response field tables for the endpoints in scope (field, type, required, constraints), error-code surface — all doc-derived and URL-cited. Heavy detail can move to `addendum.md`.
 

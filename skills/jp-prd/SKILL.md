@@ -22,15 +22,17 @@ You help the user create, edit, or validate a high quality PRD for a **Juspay pa
 - **Product catalog.** `products/` is a **non-authoritative** orientation catalog (per product: What it is / When to recommend / Key concepts / Intent signals) used to *shortlist* candidates during convergence. It is not the source of truth — reconcile the chosen slug/shape/platforms against `docs-mcp` before locking. See `products/README.md`.
 - **Workspace.** `{doc_workspace}` is `{project-root}/docs/juspay/` (create it if absent). Artifacts produced here: `prd.md`, `addendum.md`, `.decision-log.md`, plus transient `review-*.md` / `reconcile-*.md`. `jp-architecture` and `jp-executor` read from this same folder.
 - **No config of our own.** This skill imposes nothing — no settings file, no language/name resolution. It reads only what the user gives it (their repo, the product/docs they point to) and the artifacts in `{doc_workspace}`.
+- **Split-repo aware.** FE and BE may live in separate repos. Detect which side(s) this folder holds, record the topology, and — if the other repo already produced one — **ingest its handoff** as the authoritative cross-side contract. See `references/split-integration.md`.
 
 ## On Activation
 
 1. Briefly orient the user: this skill produces a Juspay integration PRD, and they can ask you at any point to go deeper on a section (inline advanced elicitation) or weigh a decision from multiple perspectives. On the first message, scan for misroute: technical *how* / integration design → `jp-architecture`; actually writing the integration code → `jp-executor` — suggest the other skill before continuing.
 2. Detect intent: **Create** (no PRD), **Update** (existing PRD), **Validate** (critique only). If ambiguous, ask. For Create intent, before binding a fresh workspace, check `{doc_workspace}/prd.md` for a prior in-progress PRD (frontmatter `status` not `final`); if present, offer to resume rather than starting over.
+3. **Incoming handoff check.** Look for a `{doc_workspace}/handoff-<this_side>.md` (or a path the user offers) produced by the *other* repo's run. If present, load it and treat its Cross-Side Contract as authoritative — the PRD for this side must conform to it (don't redesign the seam). See `references/split-integration.md`.
 
 ## Intent Modes
 
-**Create.** Use `{doc_workspace}` = `{project-root}/docs/juspay/` (create if absent). Write `prd.md` with YAML frontmatter (title, status, created, updated — `created`/`updated` = today's date, initial `status: draft`), and create the `.decision-log.md` skeleton in the workspace so subsequent decisions land in a known file. Tell the user the path. Run `## Discovery`, then `## Finalize`.
+**Create.** Use `{doc_workspace}` = `{project-root}/docs/juspay/` (create if absent). Write `prd.md` with YAML frontmatter (title, status, created, updated — `created`/`updated` = today's date, initial `status: draft`; plus `topology`, `this_side`, `other_side` from the topology scan — see `references/split-integration.md`), and create the `.decision-log.md` skeleton in the workspace so subsequent decisions land in a known file. Tell the user the path. Run `## Discovery`, then `## Finalize`.
 
 **Update.** Reconcile the PRD with a change signal. Source-extract against PRD, addendum, `.decision-log.md`, and original inputs (extract, don't ingest). If `.decision-log.md` is missing, reverse-engineer a thin log from the PRD before continuing. Surface conflicts with prior decisions before applying. Then `## Finalize`.
 
@@ -44,8 +46,9 @@ Order: **Brain dump → Codebase + env scan → Merchant access (juspay-mcp) →
 
 **Codebase + env scan.** Read the target codebase and environment to ground the PRD in reality — do not ask for what you can detect:
 - **Stack & surfaces:** language/framework, package manager, backend vs frontend presence, mobile vs web (signals like `package.json`, `pubspec.yaml`, `requirements.txt`, `go.mod`, `AndroidManifest.xml`, `*.xcodeproj`, `index.html`).
+- **Topology (split-repo check):** classify which side(s) this folder holds. If the chosen product needs both BE and FE but only one is present, this is a candidate **split** — surface it (genuinely split repos / monorepo sibling / other side not started yet all resolve to `topology: split` for this run, building only the present side). Record `topology` (`single-repo` | `split`), `this_side` (`backend` | `frontend` | `fullstack`), `other_side` (`backend` | `frontend` | `none`). Detailed rules in `references/split-integration.md`.
 - **Existing payment code:** any current payment/order/checkout handling, webhook routes, order/payment DB schemas.
-- **Environment:** `.env`/config files for existing provider config, environments (sandbox/prod), secret-management style — **never read or echo secret values**, only note which keys exist. **Default to production** as the target environment unless the user explicitly names sandbox; record this in the PRD's Environments section.
+- **Environment:** `.env`/config files for existing provider config, environment/host selectors, secret-management style — **never read or echo secret values**, only note which keys exist. **Production is enforced** — record production as the target environment in the PRD's Environments section; don't ask the user to choose sandbox vs production, and note a non-production environment only if the user explicitly and unpromptedly requests it.
 Reflect what you found back to the user for confirmation.
 
 **Light ideation.** Before converging, run a short divergent pass *with the user* on which Juspay products and flows could serve their goal (e.g. checkout, payouts, refunds, subscriptions/recurring mandates, reconciliation — illustrative starting points, not an exhaustive menu to pick from). The integration is **payment-method agnostic** — which methods a merchant enables is dashboard/runtime configuration, not a PRD-time choice — so don't ask the user to pick payment methods. Keep it lightweight — a handful of options surfaced and pruned together, not a full brainstorming session. This replaces a standalone brainstorming step.
@@ -72,7 +75,7 @@ Extract from the docs what the PRD needs to be *grounded* (not to generate code)
 
 The workspace persists; stop and resume freely.
 
-**Concern scan.** As you read what the user gave you, name the integration concerns that actually matter here — webhook/signature handling, idempotency, order reconciliation, sandbox-vs-production behavior, supported payment methods, platform/SDK surface, public API contracts, tenancy/config isolation, observability, rollback/fallback, and data storage boundaries. These concerns drive which template sections to pull in from the Adapt-In Menu and which to invent when no cluster names them.
+**Concern scan.** As you read what the user gave you, name the integration concerns that actually matter here — webhook/signature handling, idempotency, order reconciliation, go-live gating, platform/SDK surface, public API contracts, tenancy/config isolation, observability, rollback/fallback, and data storage boundaries. These concerns drive which template sections to pull in from the Adapt-In Menu and which to invent when no cluster names them.
 
 **Form-factor.** If not detected from the codebase, probe — mobile / web / desktop / multi-surface / server-only / API.
 

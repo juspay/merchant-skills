@@ -25,9 +25,9 @@ For the tasks in scope, `doc_fetch_tool` the base integration pages recorded in 
 (`doc-refs`). Extract the exact request/response shapes, method/class names, and field constraints. If a
 page won't load, say so and offer the URL — do not invent.
 
-For SDK/headless integrations, treat each in-scope payment method as its own grounding unit: fetch the
-method's `process` payload page in-session and extract the exact fields/types/enums/constraints before
-writing that method's code. If a method's payload page is missing from `doc-refs` or won't load, **stop that
+For SDK/headless integrations, treat each method the architecture enumerated (a doc-derived set — never a
+user-asked list; the integration is method-agnostic) as its own grounding unit: fetch the method's `process`
+payload page in-session and extract the exact fields/types/enums/constraints before writing that method's code. If a method's payload page is missing from `doc-refs` or won't load, **stop that
 method's implementation and mark it blocked** rather than guessing from another method or a generic
 `paymentMethods` object.
 

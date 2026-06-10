@@ -18,7 +18,7 @@ Analyze the integration PRD to understand the payment scope, flows, and constrai
 
 - **Capabilities & FRs** — the payment capabilities and their testable consequences.
 - **Key Payment Journeys (UJ-N)** — the flows the integration must support (checkout, UPI collect/intent, refund, payout, reconciliation).
-- **NFRs & concerns** — PCI-DSS scope, webhook/signature security, **idempotency**, **server-to-server reconciliation**, environments (sandbox/prod), payment-method coverage, platform/SDK surfaces.
+- **NFRs & concerns** — PCI-DSS scope, webhook/signature security, **idempotency**, **server-to-server reconciliation**, environment (production target), platform/SDK surfaces. (The integration is payment-method agnostic — don't treat method selection as a concern; method enablement is dashboard config.)
 - **Non-Goals & MVP scope** — what is explicitly out.
 - **Products in scope** — the Juspay product(s) the PRD named (confirm/lock in Step 3).
 
@@ -28,12 +28,12 @@ Use `../data/integration-complexity.md` to gauge the integration's complexity. T
 
 ### 3. Reflect understanding back
 
-> "Reviewing the PRD. I see {{fr_count}} functional requirements across {{capability_list}}, targeting {{surfaces}} with {{methods}}.
+> "Reviewing the PRD. I see {{fr_count}} functional requirements across {{capability_list}}, targeting {{surfaces}}.
 >
 > **Architecturally significant:**
 > - Flows to support: {{flows}}
 > - Critical NFRs: {{PCI / idempotency / reconciliation / signature security}}
-> - Environments: {{sandbox/prod}}
+> - Environment: {{production (enforced)}}
 > - Open constraints from the PRD: {{...}}
 >
 > Does this match your understanding?"
@@ -51,7 +51,7 @@ Use `../data/integration-complexity.md` to gauge the integration's complexity. T
 
 ### Scale & Domain
 - Merchant domain: {{domain}} · complexity: {{low/medium/high}}
-- Surfaces: {{web/mobile/server}} · methods: {{cards/upi/...}}
+- Surfaces: {{web/mobile/server}} · per-method client handling: {{doc-derived for headless/SDK; none for hosted — never user-selected}}
 
 ### Constraints & Dependencies
 {{existing payment code, env, provider notes from PRD/codebase}}

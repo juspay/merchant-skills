@@ -26,8 +26,11 @@ For each capability/FR from the PRD, name where it lives in this codebase:
 - **Client ↔ Backend**: what the client requests and receives (e.g. `sdkPayload`).
 - **Data**: where order/payment state is persisted and read.
 
+### 2b. Cross-Side Contract (always for `split`; recommended otherwise)
+Author the BE↔FE seam per the schema in `references/split-integration.md` — the session/order endpoint (request/response incl. `sdkPayload`/order id/session token), SDK launch inputs, the payment-result endpoint, return-URL/callback owner, status-reconciliation owner (BE = source of truth), webhook owner (BE), and the env/config each side needs. This is what lets the **other** repo build independently. If an incoming `handoff-<this_side>.md` was ingested, **copy its contract verbatim** (it is fixed) and only fill the parts this side owns. `jp-executor` later finalizes this section as-built into `handoff-<other_side>.md`.
+
 ### 3. Concrete tree
-Produce the actual files to be created/modified in this project (respect the detected framework's conventions — do not impose a foreign layout).
+Produce the actual files to be created/modified in this project (respect the detected framework's conventions — do not impose a foreign layout). In a `split` run, scope the tree to `this_side` only.
 
 ### Content to append
 
@@ -35,7 +38,7 @@ Produce the actual files to be created/modified in this project (respect the det
 ## Integration Structure & Boundaries
 
 ### Files to Create / Modify
-{{concrete tree for THIS codebase — routes, webhook handler, sdk init, return handler, config, migrations}}
+{{concrete tree for THIS codebase — routes, webhook handler, sdk init, return handler, config, migrations; scoped to this_side when split}}
 
 ### Capability → Location Mapping
 {{FR/capability → file(s)}}
@@ -44,6 +47,9 @@ Produce the actual files to be created/modified in this project (respect the det
 - Backend ↔ Juspay: {{...}}
 - Client ↔ Backend: {{...}}
 - Data: {{where order/payment state lives}}
+
+### Cross-Side Contract (BE ↔ FE) *(always for split; omit only for single-side products with no client)*
+{{the seam per references/split-integration.md — session/order endpoint + request/response incl. sdkPayload; payment-result endpoint; return URL/callback owner; reconciliation owner (BE); webhook owner (BE); env/config per side; doc-ref URLs. Locked from an incoming handoff when one was ingested.}}
 ```
 
 ## Collaboration Options

@@ -25,12 +25,19 @@ dashboard), emit **no** task of that type — the executor's matching step self-
 with inapplicable tasks.
 
 For SDK/headless products, the client-side method work must stay **per payment method**: emit either one
-task per in-scope method or explicit method-level substeps, and include that method's `process` payload page
-in `doc-refs`. Never emit one generic payment-method task with no per-method payload refs.
+task per method **the product's docs expose** (a doc-derived set — never a user-asked method list; the
+integration is method-agnostic) or explicit method-level substeps, and include that method's `process`
+payload page in `doc-refs`. Never emit one generic payment-method task with no per-method payload refs.
+*(Hosted/redirect products have no per-method client task.)*
 
-For each task fill: `id`, `type`, `depends-on`, `files`, `params` (+ provenance), `acceptance`,
-`doc-refs`, `status: todo`. Pull `manual-dashboard` tasks from the **Portal Configuration** block
-(navigation path + deep link + events).
+For each task fill: `id`, `type`, **`side`** (`backend` | `frontend` | `shared`), `depends-on`, `files`,
+`params` (+ provenance), `acceptance`, `doc-refs`, `status: todo`. Pull `manual-dashboard` tasks from the
+**Portal Configuration** block (navigation path + deep link + events).
+
+**Tag every task with `side`** so `jp-executor` can partition work in a `split` run (it runs `side ∈ {this_side,
+shared}` and carries `other_side` tasks into the handoff). Emit tasks for **both** sides even when this is a
+split run — the `other_side` tasks are the spec the other repo's agent will execute. See
+`references/split-integration.md`.
 
 ### 2. Map coverage
 

@@ -30,9 +30,13 @@ Do **not** proceed without the checklist + architecture. Load them completely; n
 
 Also pick up the **juspay-mcp mode** and merchant data recorded upstream (see `../references/juspay-mcp.md`). When implementation needs live data the upstream didn't supply — chiefly API-key provisioning and dashboard webhook/return-URL configuration — run the access flow then: **ask access → log in (connected) or manual Q&A**. Never block; secrets go only to `.env`.
 
+Pick up the **topology** (`topology`/`this_side`/`other_side`) from `architecture.md` (or `prd.md`). **Incoming-handoff check:** if `{doc_workspace}/handoff-<this_side>.md` exists (or the user points to one), load it — its **Cross-Side Contract is authoritative**: build this side to its exact endpoint/`sdkPayload`/env shapes and don't redesign the seam (see `../references/split-integration.md`).
+
 ### 2. Build the execution queue
 
 Parse `task-checklist.md` into an ordered execution queue, respecting each task's `depends-on`. Use `architecture.md` for the rationale/context behind each task (decisions, product/shape/platform, structure, the **Portal Configuration** block with dashboard nav paths / deep links, and the doc URLs to re-fetch). Confirm the queue with the user. As you implement, write each task's `status` back to `task-checklist.md` (`todo` → `done` | `blocked` | `skipped`) — never put secret values in it.
+
+**Filter by `side` (split runs).** When `topology: split`, the execution queue is only the tasks where `side ∈ {this_side, shared}`. Mark every `side == other_side` task `skipped` with reason `"other side (separate repo) — see handoff-<other_side>.md"` (do **not** delete them — step 9 carries them into the handoff). In a `single-repo` run, all sides execute locally.
 
 ### 3. Re-scan the codebase
 

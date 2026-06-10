@@ -23,7 +23,7 @@ The dedicated **`jp-validate`** skill is the thorough tester: it detects the rep
 
 ### 2. Inline smoke (fallback — if the user declines or `jp-validate` isn't available)
 
-Before any live action, confirm the configured key/stage and host/base URL agree (sandbox key ↔ sandbox host, production key ↔ production host); **default to production** when none was named. A dummy/test gateway returned by the MCP is acceptable for integration testing.
+Before any live action, confirm the configured key/stage and host/base URL agree (production key ↔ production host); **production is enforced** — never ask which environment to use. A dummy/test gateway returned by the MCP is acceptable for integration testing.
 
 Then run a minimal end-to-end smoke against what was built — detect the start command, confirm, bring the server up; create an order/session (assert 2xx + the documented field) and check its status (server-to-server). Diagnose/fix/re-run on failure. This is a liveness check, **not** full coverage — defer the rest to `jp-validate`.
 

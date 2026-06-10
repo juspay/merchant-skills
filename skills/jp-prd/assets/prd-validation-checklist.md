@@ -131,8 +131,9 @@ Look for:
 - **Reconciliation as source of truth.** The PRD requires server-to-server order-status reconciliation and does **not** treat the SDK/client result as authoritative.
 - **Idempotency.** Webhook/event handling is required to be idempotent; duplicate-order prevention is addressed.
 - **Security & secrets.** Credential handling (no keys in code/logs), webhook **signature verification**, and redirect/return-URL integrity appear where the integration requires them.
-- **Environments.** Sandbox vs production is distinguished, with a go-live gate.
-- **Method/flow coverage.** The payment methods and flows in scope are explicit, and the integration stages each implies are acknowledged.
+- **Environments.** Production is the enforced target; the production host/credentials and go-live gate are defined (a non-production environment appears only if the user explicitly required it).
+- **Flow coverage.** The payment **flows/stages** in scope (one-time, recurring/mandate, refund, payout, reconciliation) are explicit. Do **not** require an enumerated payment-method list — the integration is method-agnostic and methods are dashboard-enabled; flagging "methods not listed" is wrong, not a gap.
+- **Topology / split repos.** `topology`/`this_side`/`other_side` are recorded; when `split`, the PRD states which side this repo builds and identifies the BE↔FE seam the other repo depends on (so `jp-architecture` can lock the Cross-Side Contract).
 
 Red flag: an implementation-handoff PRD that trusts the client result, has no signature verification where webhooks/callbacks are in scope, has no idempotency, or invents Juspay field names not in the fetched docs.
 

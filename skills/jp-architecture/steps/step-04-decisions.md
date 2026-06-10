@@ -4,7 +4,7 @@
 
 - 📖 Read this complete step file before acting.
 - 🌐 Ground API/SDK shapes in docs-mcp; fetch the base integration pages, the webhooks/order-status pages, **and the per-method client `process` payload pages** before deciding (`doc_fetch_tool`). Cite URLs. Never invent field names.
-- ⚖️ **Equal rigor for client and backend.** The client-side `process` payload is extracted to field level for EVERY in-scope payment method — not deferred to the executor with "re-fetch later." Deferring it is precisely how method-payload bugs incubate.
+- ⚖️ **Equal rigor for client and backend.** The client-side `process` payload is extracted to field level for **every method the product's docs expose** (never a user-supplied list — methods are dashboard-enabled and the integration is method-agnostic) — not deferred to the executor with "re-fetch later." Deferring it is precisely how method-payload bugs incubate.
 - ✅ Facilitate decisions WITH the user; present options and trade-offs, not just recommendations.
 - ⚠️ NO TIME ESTIMATES. 💾 Only save when the user confirms they want to continue, category by category.
 
@@ -25,7 +25,7 @@ Address **only the categories this integration actually needs** — don't manufa
 - What the client receives (e.g. `sdkPayload`) and how it launches the payment.
 
 ### 1b. Client `process` payload — per payment method *(SDK/headless products)*
-- For **each** in-scope method, fetch the method's `process` page and extract the **exact `process` request shape**: required fields, field types, enums, and method-specific constraints. Record per method, with the source URL. Cover every method the PRD scoped — do not truncate to the common ones (UPI collect/intent, card, netbanking, wallet); EMI, BNPL/PayLater, UPI Autopay, gift card, QR, and others count too.
+- For **each method the product's docs expose**, fetch the method's `process` page and extract the **exact `process` request shape**: required fields, field types, enums, and method-specific constraints. Record per method, with the source URL. **Never ask the user which methods** — derive the set from the docs (the integration is method-agnostic; enablement is dashboard config). Do not truncate to the common ones (UPI collect/intent, card, netbanking, wallet); EMI, BNPL/PayLater, UPI Autopay, gift card, QR, and others count too. *(Hosted/redirect products have no per-method client payload — skip 1b.)*
 - This carries the same field-level rigor as the backend APIs. Do not collapse "all methods" into one generic payload, and do not push the extraction to the executor.
 
 ### 2. Credentials & secrets handling
@@ -45,10 +45,11 @@ Address **only the categories this integration actually needs** — don't manufa
 - Order/payment schema (extend existing vs new table) and the fields to persist (from docs constraints). Decide format only; executor implements.
 
 ### 6. Environments & error handling
-- Host and credential set **per environment** — production by default, plus sandbox and any staging/pre-production
-  the merchant actually uses; don't assume exactly two. Go-live gating; how key type/stage is kept aligned with
-  the configured host. **Default to production** for the integration unless the PRD or user explicitly
-  selects another environment.
+- **Production is enforced.** The integration targets the **production** environment. Do **not** ask the user
+  which environment to use and do **not** present sandbox vs production as a choice; switch to a non-production
+  environment (sandbox / staging / pre-production) **only** if the user explicitly and unpromptedly requests it.
+  Record the production host + credential set, how key type/stage is kept aligned with the configured host, and
+  go-live gating.
 - Error-code surface (from docs) and how each class is handled/surfaced; default provider-error handling
   must preserve the full provider error body for debugging unless a field is explicitly redacted.
 
@@ -72,7 +73,7 @@ Check cascading implications after each major decision.
 {{decisions + source URLs}}
 
 ### Client Process Payloads — per method *(SDK/headless only)*
-{{one block per in-scope method: method name → exact `process` request fields, types, enums, constraints → source URL}}
+{{one block per method the docs expose: method name → exact `process` request fields, types, enums, constraints → source URL}}
 
 ### Credentials & Secrets
 {{strategy}}
@@ -87,7 +88,7 @@ Check cascading implications after each major decision.
 {{schema decisions}}
 
 ### Environments & Error Handling
-{{sandbox/prod, error mapping}}
+{{environment (production enforced; note a non-production env only if the user explicitly required it); error mapping}}
 
 ### Portal Configuration (dashboard)
 {{one entry per setting that must be configured in the dashboard — what to set, navigation path, deep link (if any), events — each with its docs source URL. Omit the section if no portal config is needed.}}

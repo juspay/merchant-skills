@@ -18,16 +18,18 @@ Validate the complete architecture for coherence, payment-flow coverage, and go-
 
 ### 2. PRD coverage
 - Every capability/FR and Key Payment Journey has architectural support?
-- Every payment method/flow in MVP scope is covered?
+- Every payment **flow** in MVP scope is covered? (Methods are doc-derived/dashboard-enabled, not an MVP scoping question.)
 - NFRs addressed: PCI scope, signature verification, idempotency, reconciliation, environments?
 
 ### 3. Implementation readiness (for jp-executor)
 - Are decisions concrete enough to implement without re-deciding?
 - Are file locations, status mapping, env vars, and error handling specified?
 - Are the authoritative doc page URLs recorded so executor can re-fetch exact code?
-- **Is the client `process` payload extracted to field level for every in-scope method** (not just listed as a URL to fetch later)? A method whose payload is deferred is a critical readiness gap, not a minor one.
+- **Is the client `process` payload extracted to field level for every method the product's docs expose** (not just listed as a URL to fetch later)? A method whose payload is deferred is a critical readiness gap, not a minor one. *(The set is doc-derived, never user-asked; hosted products have none.)*
 - Does the architecture specify environment/key alignment and full provider-error surfacing defaults clearly
   enough that the executor won't guess?
+- Is **every task tagged with `side`**, and (for `split`) are both `this_side` and `other_side` tasks present?
+- Is the **Cross-Side Contract** complete enough that the other repo could build its side from it alone — session/order endpoint + request/response (incl. `sdkPayload`), payment-result endpoint, return-URL/reconciliation/webhook ownership, env/config per side? (When a handoff was ingested, the contract must match it.)
 
 ### 4. Go-live readiness checklist
 
@@ -36,8 +38,8 @@ Validate the complete architecture for coherence, payment-flow coverage, and go-
 Mark [x] only when confirmed; any [ ] must appear in Gap Analysis.
 
 **Payment flows**
-- [ ] Every in-scope method/flow has a covering decision
-- [ ] Client `process` payload extracted to field level for every in-scope method (not deferred)
+- [ ] Every in-scope flow has a covering decision
+- [ ] Client `process` payload extracted to field level for every method the docs expose (not deferred; doc-derived, never user-asked; none for hosted)
 - [ ] Reconciliation (server-to-server) is the source of truth
 - [ ] Idempotent webhook handling specified
 
@@ -47,8 +49,13 @@ Mark [x] only when confirmed; any [ ] must appear in Gap Analysis.
 - [ ] PCI scope understood for the chosen integration shape
 - [ ] Return-URL / redirect integrity addressed
 
+**Cross-side (split repos)** *(omit if `topology: single-repo`)*
+- [ ] Every task tagged `side`; both `this_side` and `other_side` tasks present
+- [ ] Cross-Side Contract complete (session/order + result endpoints, `sdkPayload` shape, return-URL/reconciliation/webhook ownership, env per side)
+- [ ] If a handoff was ingested, the contract matches it (seam not redesigned)
+
 **Environments**
-- [ ] Sandbox vs production hosts/credentials distinguished
+- [ ] Production host/credentials configured (production enforced; non-production env present only if the user explicitly required it)
 - [ ] Key/stage and host alignment specified
 - [ ] Go-live gate defined
 

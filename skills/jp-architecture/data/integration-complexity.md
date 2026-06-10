@@ -6,7 +6,7 @@
 
 | Driver | Lower | Higher |
 |---|---|---|
-| Payment methods | one method (e.g. UPI only) | many (cards + UPI + netbanking + wallets + EMI) |
+| Per-method client code (headless/SDK only) | hosted page renders methods (no per-method code) | headless: many distinct `process` payloads to wire (doc-derived, not user-chosen) |
 | Surfaces | single (web *or* mobile) | multi-surface (web + native mobile) |
 | Integration shape | hosted payment page (Juspay renders UI) | headless SDK, or direct API (merchant handles the surface) |
 | PCI scope | hosted page (minimal scope) | direct API / card data touching merchant systems |
@@ -14,7 +14,7 @@
 | Payouts | none | disbursing funds to payees |
 | Tenancy | single merchant | multi-merchant (per-merchant credentials/config/isolation) |
 | Reconciliation | simple order status check | high-volume, retries, idempotency-critical, partial refunds |
-| Environments | sandbox-only prototype | sandbox → production with a go-live gate |
+| Environments | production with a simple go-live gate | staged promotion / extra non-production environments the user explicitly required |
 
 A single high driver (e.g. direct API + cards = real PCI scope) raises the whole integration's complexity even if everything else is simple.
 

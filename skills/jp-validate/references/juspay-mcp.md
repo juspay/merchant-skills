@@ -4,9 +4,18 @@
 
 `docs-mcp` (documentation) is separate and needs no auth — keep using it regardless of the choice here.
 
-## Step 1 — Ask about access (always first)
+## Step 0 — Check the MCP first (before asking anything)
 
-Before any `juspay-mcp` call, ask:
+Do **not** open with the access question. First detect the server's presence and auth status, and reuse upstream state — only ask the user when none of these resolve it:
+
+1. **Already recorded upstream?** If `prd.md` / `.decision-log.md` already set the run's mode and the data this skill needs, reuse it and skip straight to using the values — don't re-ask (see "Reuse across the chain").
+2. **Is `juspay-mcp` present at all?** If the server isn't configured/available in this session, go **straight to manual mode** — do not ask the access question (there is nothing to log into).
+3. **Is it already authenticated?** If `juspay-mcp` is present and its real tools are already exposed (e.g. `juspay_get_merchant_details` is callable, or auth already succeeded this session), treat the run as **connected** and proceed to use the tools — no access question needed.
+4. **Present but not yet authenticated?** Only then continue to Step 1.
+
+## Step 1 — Ask about access (only if Step 0 didn't resolve it)
+
+When the MCP is present but not authenticated and no mode is recorded yet, ask:
 
 > "Do you have access to the Juspay dashboard (merchant portal) for this integration?
 > 1. **Yes — log in** so I can pull live account details (merchant ID, settings, webhooks) directly.

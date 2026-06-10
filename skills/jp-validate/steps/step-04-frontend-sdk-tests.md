@@ -21,7 +21,7 @@ Exercise the built client surface from the step-02 plan, verifying the payment c
 1. **Web (browser runner present)** — drive a real transaction with a doc test card/VPA: launch the page/SDK, complete the flow, verify the **return URL** is reached, then assert final state is resolved by **server-side reconciliation** (not redirect params alone). Persist a Playwright/Cypress spec mirroring repo conventions; honor the test-quality DoD (no hard waits — use the framework's auto-waiting/assertions).
 2. **Web (no browser runner)** — guided manual run: exact steps + the doc test instruments + expected outcome; automate any headless portion via curl where the flow allows. Persist nothing browser-specific.
 3. **Hosted SDK** (e.g. Hyper Checkout) — verify the modal/overlay launches and the success/failure callback fires, followed by reconciliation.
-4. **Headless** — verify each in-scope method's merchant-built UI submits the correct `process` payload (cross-check the fetched payload page).
+4. **Headless** — verify each built method's merchant-built UI submits the correct `process` payload (cross-check the fetched payload page).
 5. **Mobile / native** — emit a **manual test guide**: exact steps, test instruments (cards/VPAs from docs), and the expected callbacks/state transitions. Mark these `test` tasks as manual, not automated-pass.
 
 ## VERIFY & RECORD
