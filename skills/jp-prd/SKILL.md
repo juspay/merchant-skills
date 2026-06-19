@@ -26,6 +26,10 @@ You help the user create, edit, or validate a high quality PRD for a **Juspay pa
 
 ## On Activation
 
+**0. Connect to the merchant FIRST — before any question, before the codebase scan.** Your very first action in this skill is to attempt **`juspay_get_merchant_details`** (it takes no arguments). In a launcher-provisioned session the dashboard MCP (`juspay-mcp`) is already authenticated, so the call just works — **do NOT ask whether the user has dashboard access, and do NOT ask which Juspay product they want, before you've tried this call.**
+   - **Returns data → CONNECTED.** Record `merchant_id`, `client_id` (default = `merchant_id`), and **`integrationType`** — the live products on the account (`PP` = HyperCheckout, `EC_API` = Express Checkout API, `EC_SDK` = Express Checkout SDK). This is **ground truth for the whole session**: you already know what they run, so *confirm against it* in Product selection — never present a blind product menu. Log it (provenance `mcp`) in `.decision-log.md`.
+   - **The tool isn't available, or the call errors → MANUAL mode.** Only then may the access question be asked; fall back per `references/juspay-mcp.md`. Never block.
+
 1. Briefly orient the user: this skill produces a Juspay integration PRD, and they can ask you at any point to go deeper on a section (inline advanced elicitation) or weigh a decision from multiple perspectives. On the first message, scan for misroute: technical *how* / integration design → `jp-architecture`; actually writing the integration code → `jp-executor` — suggest the other skill before continuing.
 2. Detect intent: **Create** (no PRD), **Update** (existing PRD), **Validate** (critique only). If ambiguous, ask. For Create intent, before binding a fresh workspace, check `{doc_workspace}/prd.md` for a prior in-progress PRD (frontmatter `status` not `final`); if present, offer to resume rather than starting over.
 3. **Incoming handoff check.** Look for a `{doc_workspace}/handoff-<this_side>.md` (or a path the user offers) produced by the *other* repo's run. If present, load it and treat its Cross-Side Contract as authoritative — the PRD for this side must conform to it (don't redesign the seam). See `references/split-integration.md`.
@@ -40,7 +44,7 @@ You help the user create, edit, or validate a high quality PRD for a **Juspay pa
 
 ## Discovery
 
-Order: **Brain dump → Codebase + env scan → Merchant access (juspay-mcp) → Product selection → Working mode → mode-scoped work.** Get to working mode fast — a few turns, not ten. Users in a hurry must not be held hostage by upstream probing. **Merchant access runs *before* product selection** — when the account tells us what's integrated, we confirm rather than ask.
+Order: **(On-Activation connect already ran) → Brain dump → Codebase + env scan → Product selection → Working mode → mode-scoped work.** Get to working mode fast — a few turns, not ten. Users in a hurry must not be held hostage by upstream probing. The merchant connection happened in **On Activation step 0** — so by the time you reach Product selection you already know what the account runs, and you **confirm, never ask blind**.
 
 **Brain dump.** Always the first move, even when the user opens with paragraphs of context. Ask for verbal context *and* any existing inputs they want you to read — product brief, existing integration notes, prior PRD draft, design docs, the target codebase. Paths or paste; big docs are fine, you will extract. A simple "anything else?" surfaces what they almost forgot.
 
@@ -51,9 +55,7 @@ Order: **Brain dump → Codebase + env scan → Merchant access (juspay-mcp) →
 - **Environment:** `.env`/config files for existing provider config, environment/host selectors, secret-management style — **never read or echo secret values**, only note which keys exist. **Production is enforced** — record production as the target environment in the PRD's Environments section; don't ask the user to choose sandbox vs production, and note a non-production environment only if the user explicitly and unpromptedly requests it.
 Reflect what you found back to the user for confirmation.
 
-**Merchant access (juspay-mcp).** Establish the run's mode per `references/juspay-mcp.md` — **work Step 0 first**: reuse any mode recorded upstream, and if `juspay-mcp`'s tools are already exposed (e.g. the launcher pre-authenticated the dashboard MCP) you're already **connected** — don't ask. Only if still unresolved, ask whether the user has Juspay dashboard access:
-- **Yes → log in** (`authenticate` → `complete_authentication`). On success (**connected mode**), pull `juspay_get_merchant_details` to read `merchant_id`, `client_id` (default = `merchant_id`), and **`integrationType`** — the array of products the account already has live: `PP` (Payment Page / HyperCheckout), `EC_API` (Express Checkout API), `EC_SDK` (Express Checkout SDK). This **drives Product selection below** — confirm against it, don't ask blind. On any failure, fall back to manual.
-- **No / skip → manual mode**: ask the user for those same identifiers, or mark them *to confirm in the dashboard*. Never block.
+**Merchant access (juspay-mcp).** Already handled in **On Activation step 0** — **reuse its result** (mode + `merchant_id` / `client_id` / `integrationType`); do **not** re-call `juspay_get_merchant_details` and do **not** re-ask. The only work left here: if step 0 landed in **manual mode** (tool unavailable) and identifiers are still needed, gather them now — user-provided, or marked *to confirm in the dashboard* — per `references/juspay-mcp.md`. If step 0 was **connected**, you already have everything; go straight to Product selection. Never block.
 
 Record the chosen mode and each value with its provenance (`mcp` | `user` | `manual-dashboard`) in `prd.md` and `.decision-log.md` so `jp-architecture` and `jp-executor` reuse it. Only dashboard *read* calls belong here; credential provisioning happens in `jp-executor`.
 
