@@ -40,7 +40,7 @@ You help the user create, edit, or validate a high quality PRD for a **Juspay pa
 
 ## Discovery
 
-Order: **Brain dump → Codebase + env scan → Merchant access (juspay-mcp) → Product convergence (docs-mcp) → Working mode → mode-scoped work.** Get to working mode fast — a few turns, not ten. Users in a hurry must not be held hostage by upstream probing.
+Order: **Brain dump → Codebase + env scan → Merchant access (juspay-mcp) → Product selection → Working mode → mode-scoped work.** Get to working mode fast — a few turns, not ten. Users in a hurry must not be held hostage by upstream probing. **Merchant access runs *before* product selection** — when the account tells us what's integrated, we confirm rather than ask.
 
 **Brain dump.** Always the first move, even when the user opens with paragraphs of context. Ask for verbal context *and* any existing inputs they want you to read — product brief, existing integration notes, prior PRD draft, design docs, the target codebase. Paths or paste; big docs are fine, you will extract. A simple "anything else?" surfaces what they almost forgot.
 
@@ -51,20 +51,23 @@ Order: **Brain dump → Codebase + env scan → Merchant access (juspay-mcp) →
 - **Environment:** `.env`/config files for existing provider config, environment/host selectors, secret-management style — **never read or echo secret values**, only note which keys exist. **Production is enforced** — record production as the target environment in the PRD's Environments section; don't ask the user to choose sandbox vs production, and note a non-production environment only if the user explicitly and unpromptedly requests it.
 Reflect what you found back to the user for confirmation.
 
-**Light ideation.** Before converging, run a short divergent pass *with the user* on which Juspay products and flows could serve their goal (e.g. checkout, payouts, refunds, subscriptions/recurring mandates, reconciliation — illustrative starting points, not an exhaustive menu to pick from). The integration is **payment-method agnostic** — which methods a merchant enables is dashboard/runtime configuration, not a PRD-time choice — so don't ask the user to pick payment methods. Keep it lightweight — a handful of options surfaced and pruned together, not a full brainstorming session. This replaces a standalone brainstorming step.
-
-**Merchant access (juspay-mcp).** Establish the run's mode, following `references/juspay-mcp.md`. **First ask whether the user has Juspay dashboard access:**
-- **Yes → log in** (`authenticate` → `complete_authentication`). On success (**connected mode**), pull `juspay_get_merchant_details` to read `merchant_id`, `client_id` (default = `merchant_id`), and `integration_type` — these help converge on the product/integration shape below. On any failure, fall back to manual.
+**Merchant access (juspay-mcp).** Establish the run's mode per `references/juspay-mcp.md` — **work Step 0 first**: reuse any mode recorded upstream, and if `juspay-mcp`'s tools are already exposed (e.g. the launcher pre-authenticated the dashboard MCP) you're already **connected** — don't ask. Only if still unresolved, ask whether the user has Juspay dashboard access:
+- **Yes → log in** (`authenticate` → `complete_authentication`). On success (**connected mode**), pull `juspay_get_merchant_details` to read `merchant_id`, `client_id` (default = `merchant_id`), and **`integrationType`** — the array of products the account already has live: `PP` (Payment Page / HyperCheckout), `EC_API` (Express Checkout API), `EC_SDK` (Express Checkout SDK). This **drives Product selection below** — confirm against it, don't ask blind. On any failure, fall back to manual.
 - **No / skip → manual mode**: ask the user for those same identifiers, or mark them *to confirm in the dashboard*. Never block.
 
 Record the chosen mode and each value with its provenance (`mcp` | `user` | `manual-dashboard`) in `prd.md` and `.decision-log.md` so `jp-architecture` and `jp-executor` reuse it. Only dashboard *read* calls belong here; credential provisioning happens in `jp-executor`.
 
-**Product convergence (catalog → docs-mcp).** Match, then confirm. In connected mode, let the merchant's `integration_type` inform (not override) the choice:
-0. **Read `products/` first** — use *When to recommend* / *Intent signals* / *What it is* to shortlist 1–3 candidate products (orientation only; see `products/README.md`).
-1. If the catalog is inconclusive, `list_products(category?)` to browse the live catalog.
-2. Converge **with the user** on the product(s) the integration targets.
-3. **Confirm via docs-mcp:** `explore_product(slug)` for the chosen product's doc index (reconcile slug/shape/platforms against it), then `doc_fetch_tool(url)` on the pages that define credentials, request/response fields, error codes, and webhook structure.
-Extract from the docs what the PRD needs to be *grounded* (not to generate code): the domain vocabulary for the Glossary, the capabilities and constraints that shape FRs, the error/edge surface, and the integration shape (hosted page / headless SDK / direct API). Tag each extracted fact with its source URL.
+**Product selection.** Branch on what we already know — **never present a hardcoded menu, and never propose products the account doesn't have**:
+
+- **Connected with a non-empty `integrationType`** → ground the choice in the account. State the MID and the live integrations mapped to readable shapes (`PP` → HyperCheckout, `EC_API` → Express Checkout API, `EC_SDK` → Express Checkout SDK), combine with the codebase signal, and **infer-and-confirm** the target — e.g. "Signed in as `<MID>`; your account has **Payment Page + EC API + EC SDK**, and this repo looks like `<web/backend>`, so I'm assuming we're building/extending **EC SDK** — right?". Offer the account's integrations as the options to confirm or pick among, plus a **"something else / add a new product"** choice that drops to the catalog path below. Do not surface products outside `integrationType` as primary options.
+- **Otherwise** (empty/absent `integrationType` — new merchant, manual mode, or no MCP) → **converge from the catalog + docs**, driven by the user's goal:
+  0. **Read `products/` first** — *When to recommend* / *Intent signals* / *What it is* to shortlist 1–3 candidates (orientation only; see `products/README.md`).
+  1. `list_products(category?)` to browse the live catalog when the shortlist is inconclusive.
+  2. Converge **with the user** on the product(s) the integration targets.
+
+**Confirm via docs-mcp (both branches):** `explore_product(slug)` for the chosen product's doc index (reconcile slug/shape/platforms against it), then `doc_fetch_tool(url)` on the pages that define credentials, request/response fields, error codes, and webhook structure. Extract what the PRD needs to be *grounded* (not to generate code): the Glossary vocabulary, the capabilities and constraints that shape FRs, the error/edge surface, and the integration shape (hosted page / headless SDK / direct API). Tag each extracted fact with its source URL.
+
+The integration is **payment-method agnostic** — which methods a merchant enables is dashboard/runtime configuration, not a PRD-time choice — so don't ask the user to pick payment methods.
 
 **Elicitation, not direction.** Discovery pulls the user's vision out; it does not insert yours. Open-ended "tell me about X" beats multiple choice. When you find yourself naming MVP cuts or proposing phases, stop — hand the pen back. Infer-and-confirm ("I'm assuming v1 is web checkout only, no mobile surface — right?") is fine. If the user wants a section explored more deeply or weighed from multiple angles, do that inline.
 

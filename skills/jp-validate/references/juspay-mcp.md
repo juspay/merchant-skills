@@ -51,7 +51,7 @@ The mode and these values flow downstream via the artifacts (`prd.md`, `architec
 
 Expected live tools (names from the existing `integrate` skill; the real set appears only after auth). These per-skill lists are the **known** read tools, **not an exhaustive allowlist** — after auth, enumerate the tools the MCP actually exposes and use any additional relevant *read* tools it offers; don't skip a useful call just because it isn't listed here:
 
-- **jp-prd** *(read)* — `juspay_get_merchant_details` → `merchant_id`, `client_id` (default = `merchant_id`), `integration_type` (helps converge on the product/integration shape). Optional: current settings to know existing state.
+- **jp-prd** *(read)* — `juspay_get_merchant_details` → `merchant_id`, `client_id` (default = `merchant_id`), and **`integrationType`** — the array of products the account already has live: `PP` → HyperCheckout (`hyper-checkout`), `EC_API` → Express Checkout API (`ec-api`), `EC_SDK` → Express Checkout SDK (`ec-headless`). This **drives product selection**: pre-fill the account's integrations and **confirm** the target rather than asking blind, and **don't propose products not in the array**. (The same single call returns the MID + this array — no extra tool call.) Optional: current settings to know existing state.
 - **jp-architecture** *(read)* — `juspay_get_webhook_settings` (configured? events), `juspay_get_general_settings` (return URL configured?), `juspay_integration_monitoring_status` (integration stages / flows to cover).
 - **jp-executor** *(write/confirm)* — `juspay_create_api_key` (provision), dashboard webhook/return-URL configuration, `juspay_integration_monitoring_status` (confirm stages after tests).
 
