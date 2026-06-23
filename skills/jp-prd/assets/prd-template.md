@@ -52,7 +52,7 @@ status: draft
 *Downstream skills and readers must use these terms exactly. Sourced from Juspay docs (cite URLs). No synonyms anywhere else in the PRD.*
 
 - **Term** — Definition. Relationship to other terms. *(source URL)*
-- [e.g. **Session** — a backend-created order session; the `sdkPayload` from the response launches the client SDK. **Order Status API** — server-to-server reconciliation of final payment state. **Webhook** — async final-status notification; idempotent handling required. **merchant_id / client_id**, **integration type (PP / ec_sdk / ec_api)**, **signature verification** — define each from the fetched docs.]
+- [e.g. **Session** — a backend-created order session; the `sdkPayload` from the response launches the client SDK. **Order Status API** — server-to-server reconciliation of final payment state. **Webhook** — async final-status notification; idempotent handling required. **merchant_id / client_id**, **`integrationType`** (the account's live products from `juspay_get_merchant_details`, provenance `mcp` — `PP` / `EC_API` / `EC_SDK`), **signature verification** — define each from the fetched docs.]
 
 ## 4. Capabilities
 *Each subsection is a coherent capability: behavioral description first, FRs nested, optional capability-specific NFRs. FRs numbered globally (FR-1..FR-N). Reference journeys by ID inline.*

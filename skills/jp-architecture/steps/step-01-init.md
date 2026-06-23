@@ -32,7 +32,7 @@ The integration PRD from `jp-prd` is required. Discover and confirm with the use
 
 Confirm what you found and ask if the user wants to add anything. Then load ALL confirmed files completely. Track them in frontmatter `inputDocuments`.
 
-From the PRD / `.decision-log.md`, also pick up the **juspay-mcp mode** (`connected` | `manual`) and any recorded merchant data (`merchant_id`, `client_id`, `integration_type`) with their provenance — reuse these and do not re-ask. If the mode wasn't established upstream and a later step needs live settings, run the access flow then (see `references/juspay-mcp.md`).
+From the PRD / `.decision-log.md`, also pick up the **juspay-mcp mode** (`connected` | `manual`) and any recorded merchant data (`merchant_id`, `client_id`, and **`integrationType`** — the account's live products, e.g. `["PP","EC_API","EC_SDK"]`) with their provenance — reuse these and do not re-ask. If the mode wasn't established upstream and a later step needs live settings, run the access flow then (see `references/juspay-mcp.md`).
 
 Also pick up the **topology** (`topology`/`this_side`/`other_side`) from the PRD frontmatter (re-derive from the codebase only if absent — see `references/split-integration.md`). **Incoming-handoff check:** look for `{doc_workspace}/handoff-<this_side>.md` (or a path the user offers) produced by the other repo's run. If present, load it — its **Cross-Side Contract is authoritative**: the architecture must lock the seam from it (don't redesign), and downstream decisions build this side to those exact endpoint/`sdkPayload` shapes.
 

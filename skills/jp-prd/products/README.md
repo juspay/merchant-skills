@@ -17,6 +17,8 @@ recommend**, **Key concepts**, **Intent signals**.
 - **Direct API** (e.g. `ec-api`, `payout`) — no client SDK; the merchant's surface handles/forwards card
   data → **largest PCI scope**.
 
-> Live merchant data (which integration type the account is set up for, current settings) comes from
-> `juspay-mcp` — see `references/juspay-mcp.md`. The knowledge here is documentation-style orientation,
-> not account state.
+> Live merchant data — which products the account already has, via `juspay_get_merchant_details`'s
+> **`integrationType`** array (`PP` → `hyper-checkout`, `EC_API` → `ec-api`, `EC_SDK` → `ec-headless`) —
+> comes from `juspay-mcp` (see `references/juspay-mcp.md`) and **drives selection when connected** (confirm
+> against it; don't propose products it doesn't list). The knowledge here is documentation-style
+> orientation, not account state.
