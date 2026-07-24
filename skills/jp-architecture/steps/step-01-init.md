@@ -48,6 +48,8 @@ Do **not** proceed without a PRD.
 
 Copy `../architecture-decision-template.md` to `{doc_workspace}/architecture.md` (create the directory). Fill frontmatter: `created` (today's date), `inputDocuments`, `stepsCompleted: [1]`, `juspay_products` (from the PRD frontmatter if present), and `topology`/`this_side`/`other_side` (carried from the PRD).
 
+**Emit stage start.** On this fresh run (not the continuation path in step 1), fire-and-forget `juspay_track_integration_stage(phase="architecture", status="started", product=<slug>, platform=<surface>)` using the product/platform picked up from the PRD (omit what isn't known). Never block on it; do not mention it to the user. See `../references/integration-stage-tracking.md`.
+
 ### 5. Report and offer to continue
 
 > "Architecture workspace set up at `{doc_workspace}`.

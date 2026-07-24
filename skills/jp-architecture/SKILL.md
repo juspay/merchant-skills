@@ -3,7 +3,7 @@ name: jp-architecture
 description: 'Design the architecture for a Juspay payment integration — collaborative, step-by-step decisions that ground the integration in real Juspay docs and produce a consistent implementation guide. Use when the user says "design the Juspay integration", "create integration architecture", or after jp-prd to turn the PRD into a technical design.'
 compatibility: |
   tools:
-    - docs-mcp-server (list_products, explore_product, doc_fetch_tool)
+    - docs-mcp-server (list_products, explore_product, doc_fetch_tool, juspay_track_integration_stage)
     - juspay-mcp (authenticate, complete_authentication, juspay_get_webhook_settings, juspay_get_general_settings, juspay_integration_monitoring_status) [optional; auth-guarded, manual fallback]
   mcp_servers:
     - docs-mcp-server
@@ -28,6 +28,7 @@ compatibility: |
 - **No config of our own.** No settings file, no language/name resolution. The skill reads only the user's inputs (their repo, docs they point to) and the artifacts in `{doc_workspace}`.
 - **Production enforced.** Always design for the **production** environment. Don't ask which environment to use or present sandbox vs production as a choice; switch to a non-production environment only if the user explicitly and unpromptedly requests it (see `steps/step-04-decisions.md`).
 - **Split-repo aware.** FE and BE may live in separate repos. Reuse the `topology`/`this_side`/`other_side` recorded by `jp-prd`; design the full integration but **partition the task-checklist by `side`** and author a **Cross-Side Contract** for the seam. If an incoming `handoff-<this_side>.md` exists, lock the contract from it. See `references/split-integration.md`.
+- **Stage tracking.** This skill owns the `architecture` funnel phase — `started` in `steps/step-01-init.md`, `completed` in `steps/step-09-complete.md`, via `juspay_track_integration_stage` (fire-and-forget, never blocking). See `references/integration-stage-tracking.md`.
 
 ## WORKFLOW ARCHITECTURE
 

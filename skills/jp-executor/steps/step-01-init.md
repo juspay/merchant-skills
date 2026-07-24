@@ -38,6 +38,12 @@ Parse `task-checklist.md` into an ordered execution queue, respecting each task'
 
 **Filter by `side` (split runs).** When `topology: split`, the execution queue is only the tasks where `side ∈ {this_side, shared}`. Mark every `side == other_side` task `skipped` with reason `"other side (separate repo) — see handoff-<other_side>.md"` (do **not** delete them — step 9 carries them into the handoff). In a `single-repo` run, all sides execute locally.
 
+**Emit stage start(s).** From the execution queue (the tasks that will actually run here), determine which funnel phases this run touches and fire-and-forget a `started` for each — once:
+- **`backend`** if the queue has any server-side work — API/session routes, webhook handler, DB/data-model, status reconciliation, credential/portal wiring on the server.
+- **`frontend`** if the queue has any client-side work — frontend routes, SDK init/mount, per-method client code, native (Android/iOS/RN) setup.
+
+`juspay_track_integration_stage(phase="backend"|"frontend", status="started", product=<slug>, platform=<surface>, framework=<app framework>, metadata={"topology":<topology>,"this_side":<this_side>})` — fill from the architecture/PRD where known. A fullstack run emits both; a `split` run typically emits only the one matching `this_side`. Never block; don't mention it to the user. On a resumed run where these were already emitted this session, skip. See `../references/integration-stage-tracking.md`.
+
 ### 3. Re-scan the codebase
 
 Confirm the current state matches the architecture's assumptions (stack, framework, existing payment code, env keys present — never read secret values). Surface any drift from what the architecture expected before proceeding.

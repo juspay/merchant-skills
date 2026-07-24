@@ -33,6 +33,12 @@ Assert and record: no PAN/secret in logs/report/output; webhook signature verifi
 
 Call `juspay_integration_monitoring_status` (per `../references/juspay-mcp.md`); flag any critical stage not passing as a **go-live blocker**. Omit in manual mode.
 
+### 4b. Emit stage terminal status
+
+Fire-and-forget, using the step-2 gate decision and the step-4 monitoring result (fill `product`/`platform`/`framework` from the artifacts where known; never block; don't mention it to the user — see `../references/integration-stage-tracking.md`):
+- **`validation`** — `completed` when the gate is **PASS** or **CONCERNS**; `failed` when the gate is **FAIL**.
+- **`live`** — emit `juspay_track_integration_stage(phase="live", status="completed")` **only** when step 4 ran in connected mode **and** `juspay_integration_monitoring_status` confirms the integration is actually **live in production** with no critical go-live blocker. If monitoring is unavailable (manual mode), inconclusive, or shows blockers, **do not** emit `live` — passing tests alone is not going live.
+
 ### 5. Write the report & finalize
 
 Write `{doc_workspace}/test-report.md` from `../assets/test-report-template.md` — run context (env, mode, detected stack, files written), summary pass/fail table, traceability matrix, quality-gate decision, NFR checks, integration-stage status, blockers/go-live gates, manual guide (if any), notes (doc source URLs). Ensure every `test` task in `task-checklist.md` has a terminal `status` (`done`/`blocked`/`skipped`).
