@@ -3,7 +3,7 @@ name: jp-executor
 description: Implement a Juspay payment integration in the codebase from a jp-prd PRD and a jp-architecture design + task-checklist. Use after jp-prd and jp-architecture, when the user wants the integration actually built — credentials, SDK install, session/webhook/reconciliation code, DB schema, native setup, portal config, and live tests.
 compatibility: |
   tools:
-    - docs-mcp-server (explore_product, doc_fetch_tool)   # re-fetch exact request/response shapes + code at implementation time
+    - docs-mcp-server (explore_product, doc_fetch_tool, juspay_track_integration_stage)   # re-fetch exact request/response shapes + code at implementation time
     - juspay-mcp (authenticate, complete_authentication, juspay_create_api_key, juspay_get_webhook_settings, juspay_get_general_settings, juspay_integration_monitoring_status) [optional; auth-guarded, manual fallback]
   mcp_servers:
     - docs-mcp-server
@@ -25,6 +25,7 @@ You implement a Juspay payment integration **directly in the codebase**, driven 
 - **No config of our own.** No settings file, no language/name resolution; reads only the user's repo and the upstream artifacts.
 - **Production enforced.** Always target the **production** environment; don't ask which environment to use or offer sandbox. Only use a non-production environment if the user explicitly and unpromptedly requests it. Keep key type/stage aligned with the configured host (see `steps/step-02-credentials.md`).
 - **Split-repo aware.** Build only `side ∈ {this_side, shared}` tasks; `other_side` tasks are not implemented here — they're carried into `handoff-<other_side>.md` for the other repo's agent. If an incoming `handoff-<this_side>.md` exists, build this side to its contract and verify conformance. See `references/split-integration.md`.
+- **Stage tracking.** This skill owns the `backend` and `frontend` funnel phases, keyed to what **this run** actually builds — `started` in `steps/step-01-init.md`, terminal in `steps/step-09-summary.md`, via `juspay_track_integration_stage` (fire-and-forget, never blocking). See `references/integration-stage-tracking.md`.
 
 ## On Activation
 

@@ -3,7 +3,7 @@ name: jp-validate
 description: Test/validate a Juspay payment integration after jp-executor has built it. Detects the repo's existing test stack and replicates it (Playwright, Cypress, Jest, Vitest, pytest, supertest, …), falling back to inline curl/bash when none exists. Risk-prioritized coverage of order/session creation, server-to-server status reconciliation, webhook signature + idempotency, per-method process payloads, constraint boundaries and error-code paths — backend and frontend/SDK as the built surface dictates. Ends with a traceability matrix, a PASS/CONCERNS/FAIL quality gate, and a written test report. Use after jp-executor, or standalone against an already-built integration.
 compatibility: |
   tools:
-    - docs-mcp-server (list_products, explore_product, doc_fetch_tool)   # re-fetch exact request/response shapes, constraints/types/enums, error codes + test cards/VPAs at test-write time
+    - docs-mcp-server (list_products, explore_product, doc_fetch_tool, juspay_track_integration_stage)   # re-fetch exact request/response shapes, constraints/types/enums, error codes + test cards/VPAs at test-write time
     - juspay-mcp (authenticate, complete_authentication, juspay_integration_monitoring_status) [optional; auth-guarded, manual fallback]
   mcp_servers:
     - docs-mcp-server
@@ -25,6 +25,7 @@ You test a Juspay payment integration **that jp-executor already built**, driven
 - **Split-repo aware.** FE and BE may live in separate repos. In a `split` run, validate only the side present here and add **contract-conformance** checks (this side honors the Cross-Side Contract); the cross-side end-to-end transaction can't be driven (the other repo is absent) → record it as a documented manual/gap. See `references/split-integration.md`.
 - **Workspace.** `{doc_workspace}` is `{project-root}/docs/juspay/` — reads `prd.md`, `architecture.md`, `task-checklist.md`, `integration-summary.md` (if present), and an incoming `handoff-<this_side>.md` (if present, for the contract); writes test code into the user's codebase, updates the `test` task `status` values in `task-checklist.md`, and writes `test-report.md` back to `{doc_workspace}`. It does **not** write or alter `integration-summary.md` or `handoff-*.md` — those belong to `jp-executor`.
 - **No config of our own.** No settings file, no language/name resolution; reads only the user's repo and the upstream artifacts.
+- **Stage tracking.** This skill owns the `validation` funnel phase (and the `live` phase, strictly gated) — `started` in `steps/step-01-init.md`, terminal in `steps/step-05-report.md`, via `juspay_track_integration_stage` (fire-and-forget, never blocking). See `references/integration-stage-tracking.md`.
 
 ## On Activation
 

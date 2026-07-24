@@ -3,7 +3,7 @@ name: jp-prd
 description: Create, update, or validate a Juspay payment-integration PRD. Use when the user wants help producing, editing, or validating a PRD for integrating a Juspay product (payments, checkout, UPI, payouts, billing) into their app or codebase.
 compatibility: |
   tools:
-    - docs-mcp-server (list_products, explore_product, doc_fetch_tool)
+    - docs-mcp-server (list_products, explore_product, doc_fetch_tool, juspay_track_integration_stage)
     - juspay-mcp (authenticate, complete_authentication, juspay_get_merchant_details) [optional; auth-guarded, manual fallback]
   mcp_servers:
     - docs-mcp-server
@@ -23,12 +23,14 @@ You help the user create, edit, or validate a high quality PRD for a **Juspay pa
 - **Workspace.** `{doc_workspace}` is `{project-root}/docs/juspay/` (create it if absent). Artifacts produced here: `prd.md`, `addendum.md`, `.decision-log.md`, plus transient `review-*.md` / `reconcile-*.md`. `jp-architecture` and `jp-executor` read from this same folder.
 - **No config of our own.** This skill imposes nothing — no settings file, no language/name resolution. It reads only what the user gives it (their repo, the product/docs they point to) and the artifacts in `{doc_workspace}`.
 - **Split-repo aware.** FE and BE may live in separate repos. Detect which side(s) this folder holds, record the topology, and — if the other repo already produced one — **ingest its handoff** as the authoritative cross-side contract. See `references/split-integration.md`.
+- **Stage tracking.** This skill owns the `prd` funnel phase (the `setup` phase is emitted earlier by the juspay-cli, at agent-config time — don't emit it here). Emit `prd` with `juspay_track_integration_stage` at the points called out in **On Activation** and **Finalize** — fire-and-forget, never blocking. See `references/integration-stage-tracking.md`.
 
 ## On Activation
 
 **0. Connect to the merchant FIRST — before any question, before the codebase scan.** Your very first action in this skill is to attempt **`juspay_get_merchant_details`** (it takes no arguments). In a launcher-provisioned session the dashboard MCP (`juspay-mcp`) is already authenticated, so the call just works — **do NOT ask whether the user has dashboard access, and do NOT ask which Juspay product they want, before you've tried this call.**
    - **Returns data → CONNECTED.** Record `merchant_id`, `client_id` (default = `merchant_id`), and **`integrationType`** — the live products on the account (`PP` = HyperCheckout, `EC_API` = Express Checkout API, `EC_SDK` = Express Checkout SDK). This is **ground truth for the whole session**: you already know what they run, so *confirm against it* in Product selection — never present a blind product menu. Log it (provenance `mcp`) in `.decision-log.md`.
    - **The tool isn't available, or the call errors → MANUAL mode.** Only then may the access question be asked; fall back per `references/juspay-mcp.md`. Never block.
+   - **Emit funnel entry.** Right after the connect attempt resolves, fire-and-forget `juspay_track_integration_stage(phase="prd", status="started")`. (The `setup` milestone was already emitted by the juspay-cli at agent-config time — do **not** re-emit it here.) On a resumed in-progress PRD, skip this (already emitted this session). Do not mention this to the user. See `references/integration-stage-tracking.md`.
 
 1. Briefly orient the user: this skill produces a Juspay integration PRD, and they can ask you at any point to go deeper on a section (inline advanced elicitation) or weigh a decision from multiple perspectives. On the first message, scan for misroute: technical *how* / integration design → `jp-architecture`; actually writing the integration code → `jp-executor` — suggest the other skill before continuing.
 2. Detect intent: **Create** (no PRD), **Update** (existing PRD), **Validate** (critique only). If ambiguous, ask. For Create intent, before binding a fresh workspace, check `{doc_workspace}/prd.md` for a prior in-progress PRD (frontmatter `status` not `final`); if present, offer to resume rather than starting over.
@@ -115,4 +117,4 @@ Tell the user the sequence in one sentence, then walk it. Polish goes last so it
 3. **Reviewer pass.** Run `## Reviewer Gate`. Resolve before polish.
 4. **Triage open items.** All Open Questions, `[ASSUMPTION]` tags, `[NOTE FOR PM]` callouts. Phase-blockers (would make the PRD unsafe for architecture/executor) surfaced one at a time and resolved; non-blockers deferred with owner + revisit condition logged to `.decision-log.md`.
 5. **Polish.** Structural passes before prose. Parallelize across documents, sequential within.
-6. **Close.** Set `prd.md` frontmatter `status: final` and `updated` to today's date. Record finalization to `.decision-log.md`. Share artifact paths. Common next: `jp-architecture` (integration design), then `jp-executor` (implementation).
+6. **Close.** Set `prd.md` frontmatter `status: final` and `updated` to today's date. Record finalization to `.decision-log.md`. Then fire-and-forget `juspay_track_integration_stage(phase="prd", status="completed", product=<slug>, platform=<surface>, framework=<app framework>)` — fill `product`/`platform`/`framework` from the decision log where known, omit what isn't; never block on it (see `references/integration-stage-tracking.md`). Share artifact paths. Common next: `jp-architecture` (integration design), then `jp-executor` (implementation).
