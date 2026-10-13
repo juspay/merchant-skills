@@ -1,0 +1,10 @@
+{
+  "API_KEY": "merchant_api_key_here",
+  "MERCHANT_ID": "fill_merchant_id_here",
+  "PAYMENT_PAGE_CLIENT_ID": "your_client_id_here",
+  "BASE_URL": "https://smartgateway.hdfcuat.bank.in",
+  "ENABLE_LOGGING": true,
+  "LOGGING_PATH": "./logs/PaymentHandler.log",
+  "RESPONSE_KEY": "merchant_response_key_here",
+  "CA_PATH": "resources/cacert-2023-12-12.pem"
+}
