@@ -37,6 +37,10 @@ platforms: [android, ios, web, flutter, react-native, ...]
 ## What it is / When to recommend / Key concepts / Intent signals
 ```
 
+## HDFC SmartGateway
+
+[`HDFC-SG/`](./HDFC-SG) holds a separate, standalone skill — `hdfc-sg-integration` — for HDFC SmartGateway merchants, plus the integration kit it reads. It is **not** part of the `jp-*` pipeline and needs no MCP servers. Install with `npx juspay hdfc-sg agent-setup`.
+
 ## Source
 
 
